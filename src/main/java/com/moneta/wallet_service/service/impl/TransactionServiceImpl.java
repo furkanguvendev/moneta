@@ -1,0 +1,32 @@
+package com.moneta.wallet_service.service.impl;
+
+import com.moneta.wallet_service.entity.Transaction;
+import com.moneta.wallet_service.enums.TransactionType;
+import com.moneta.wallet_service.repository.TransactionRepository;
+import com.moneta.wallet_service.service.TransactionService;
+import com.moneta.wallet_service.service.WalletService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+
+@Service
+@RequiredArgsConstructor
+public class TransactionServiceImpl implements TransactionService {
+
+    private final TransactionRepository transactionRepository;
+    private final WalletService walletService;
+
+    @Override
+    public Transaction addTransaction(Long walletId, Transaction transaction) {
+
+        BigDecimal impact = transaction.getTransactionType() == TransactionType.INCOME
+                ? transaction.getAmount()
+                : transaction.getAmount().negate();
+
+        walletService.updateBalance(walletId, impact);
+        transaction.setWallet(walletService.getWalletById(walletId));
+
+        return transactionRepository.save(transaction);
+    }
+}
