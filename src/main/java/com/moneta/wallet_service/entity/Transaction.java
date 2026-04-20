@@ -19,9 +19,6 @@ public class Transaction {
     @Column(nullable = false)
     private BigDecimal amount;
 
-    @Column(nullable = false)
-    private String category;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransactionType transactionType;
@@ -33,4 +30,8 @@ public class Transaction {
     @ManyToOne
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
+
+    @ManyToOne
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 }

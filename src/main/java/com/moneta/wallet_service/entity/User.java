@@ -3,6 +3,7 @@ package com.moneta.wallet_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -28,4 +29,15 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Wallet> wallets;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Category> categories = new ArrayList<>();
+
+    public void addCategory(Category category){
+        if (this.categories == null) {
+            this.categories = new ArrayList<>();
+        }
+        this.categories.add(category);
+        category.setUser(this);
+    }
 }
