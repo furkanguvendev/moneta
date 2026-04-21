@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.service.impl;
 
 import com.moneta.wallet_service.entity.Transaction;
+import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.TransactionService;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,5 +30,18 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setWallet(walletService.getWalletById(walletId));
 
         return transactionRepository.save(transaction);
+    }
+
+    @Override
+    public List<Transaction> getTransactions(Long walletId) {
+
+        Wallet wallet = walletService.getWalletById(walletId);
+
+        return wallet.getTransactions();
+    }
+
+    @Override
+    public void deleteTransactions(Long transactionId) {
+        transactionRepository.deleteById(transactionId);
     }
 }

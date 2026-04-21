@@ -23,4 +23,9 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı. ID: " + id));
     }
 
+    @Override
+    public void deleteUser(Long userId) {
+        userRepository.deleteById(userId);
+    }
+
 }

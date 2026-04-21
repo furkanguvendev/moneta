@@ -20,8 +20,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public List<Category> getAllCategoriesByUserId(Long userId) {
-        // BURASI KRİTİK: user.getCategories() SİSTEM kategorilerini (null olanları) getirmez.
-        // O yüzden repository'deki özel sorgumuzu çağırıyoruz:
         return categoryRepository.findGlobalAndUserCategories(userId);
     }
 
@@ -37,7 +35,6 @@ public class CategoryServiceImpl implements CategoryService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        // Repository'deki exists metotlarını burada kontrol için kullanıyoruz
         if (categoryRepository.existsByNameAndUserIdIsNull(category.getName()) ||
                 categoryRepository.existsByNameAndUserId(category.getName(), userId)) {
             throw new RuntimeException("Bu isimde bir kategori zaten mevcut (Sistemde veya sizde).");
