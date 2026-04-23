@@ -19,11 +19,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user) {
-        return ResponseEntity.ok(userService.createUser(user));
-    }
-
     @DeleteMapping("/delete/{userId}")
     @PreAuthorize("#userId == authentication.principal.id")
     public void deleteUser(@PathVariable Long userId) {
