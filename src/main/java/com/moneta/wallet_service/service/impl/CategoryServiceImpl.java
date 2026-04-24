@@ -35,26 +35,24 @@ public class CategoryServiceImpl implements CategoryService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        if (categoryRepository.existsByNameAndUserIdIsNull(category.getName()) ||
-                categoryRepository.existsByNameAndUserId(category.getName(), userId)) {
-            throw new RuntimeException("Bu isimde bir kategori zaten mevcut (Sistemde veya sizde).");
+        boolean isDuplicate = categoryRepository.existsByNameAndUserIdIsNull(category.getName()) ||
+                categoryRepository.existsByNameAndUserId(category.getName(), userId);
+
+        if (isDuplicate) {
+            throw new RuntimeException("Bu isimde bir kategori zaten mevcut.");
         }
 
-        user.addCategory(category);
+        category.setUser(user);
         return categoryRepository.save(category);
     }
 
     @Override
     @Transactional
-    public void deleteCategory(Long id, Long userId) {
+    public void deleteCategory(Long id) {
         Category category = getCategoryById(id);
 
-        if (category.getUser() == null) {
+        if (category.getUser() == null || category.isMandatory()) {
             throw new RuntimeException("Sistem kategorileri silinemez!");
-        }
-
-        if (!category.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Bu kategoriyi silme yetkiniz yok.");
         }
 
         categoryRepository.delete(category);

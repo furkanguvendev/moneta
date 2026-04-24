@@ -1,7 +1,6 @@
 package com.moneta.wallet_service.service;
 
 import com.moneta.wallet_service.entity.Category;
-
 import java.util.List;
 
 public interface CategoryService {
@@ -12,7 +11,7 @@ public interface CategoryService {
 
     Category createCategory(Category category, Long userId);
 
-    void deleteCategory(Long id, Long userId);
+    void deleteCategory(Long id);
 
     List<Category> getMandatoryCategories();
 }

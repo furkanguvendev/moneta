@@ -7,15 +7,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/wallets")
+@RequestMapping("/wallets")
 @RequiredArgsConstructor
 public class WalletController {
 
     private final WalletService walletService;
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Wallet> getWallet(@PathVariable Long id) {
-        return ResponseEntity.ok(walletService.getWalletById(id));
+    @GetMapping("/{walletId}")
+    public ResponseEntity<Wallet> getWallet(@PathVariable Long walletId) {
+        return ResponseEntity.ok(walletService.getWalletById(walletId));
     }
 
     @PostMapping("/user/{userId}")

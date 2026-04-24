@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/categories")
+@RequestMapping("/categories")
 @RequiredArgsConstructor
 public class CategoryController {
 
@@ -25,9 +25,9 @@ public class CategoryController {
         return ResponseEntity.ok(categoryService.createCategory(category, userId));
     }
 
-    @DeleteMapping("/{id}/user/{userId}")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id, @PathVariable Long userId) {
-        categoryService.deleteCategory(id, userId);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+        categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
 

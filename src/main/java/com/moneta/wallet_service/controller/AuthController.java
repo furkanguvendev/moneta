@@ -2,35 +2,34 @@ package com.moneta.wallet_service.controller;
 
 import com.moneta.wallet_service.dto.request.LoginRequest;
 import com.moneta.wallet_service.dto.response.AuthResponse;
+import com.moneta.wallet_service.entity.Role;
 import com.moneta.wallet_service.entity.User;
+import com.moneta.wallet_service.enums.RoleType;
 import com.moneta.wallet_service.repository.UserRepository;
+import com.moneta.wallet_service.service.RoleService; // Yeni ekledik
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     @PostMapping("/login")
     public String login(@RequestBody LoginRequest loginRequest){
-
         UsernamePasswordAuthenticationToken authBileti =
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword());
 
-        Authentication  onayliKullanici = authenticationManager.authenticate(authBileti);
+        Authentication onayliKullanici = authenticationManager.authenticate(authBileti);
 
         if (onayliKullanici.isAuthenticated()) {
             return "Giriş Başarılı! Hoş geldin: " + onayliKullanici.getName();
@@ -46,8 +45,11 @@ public class AuthController {
         user.setEmail(register.getEmail());
 
         String encodedPassword = passwordEncoder.encode(register.getPassword());
-        
         user.setPassword(encodedPassword);
+
+        Role defaultRole = roleService.findByType(RoleType.USER);
+        user.getRoles().add(defaultRole);
+
         userRepository.save(user);
 
         return new AuthResponse(

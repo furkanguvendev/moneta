@@ -8,7 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -19,10 +19,10 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @DeleteMapping("/delete/{userId}")
-    @PreAuthorize("#userId == authentication.principal.id")
-    public void deleteUser(@PathVariable Long userId) {
-        userService.deleteUser(userId);
+    @DeleteMapping("/{id}")
+    @PreAuthorize("#id == authentication.principal.id")
+    public void deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
     }
 
 }
