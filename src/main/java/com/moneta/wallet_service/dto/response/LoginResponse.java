@@ -1,7 +1,8 @@
 package com.moneta.wallet_service.dto.response;
 
-public record AuthResponse(
+public record LoginResponse(
         String username,
         String email,
-        String token
-) {}
+        String token,
+        String message
+) { }
