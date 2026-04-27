@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.controller;
 
-import com.moneta.wallet_service.entity.Category;
+import com.moneta.wallet_service.dto.request.CategoryRequest;
+import com.moneta.wallet_service.dto.response.CategoryResponse;
 import com.moneta.wallet_service.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,13 +17,15 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Category>> getAllCategories(@PathVariable Long userId) {
+    public ResponseEntity<List<CategoryResponse>> getAllCategories(@PathVariable Long userId) {
         return ResponseEntity.ok(categoryService.getAllCategoriesByUserId(userId));
     }
 
     @PostMapping("/user/{userId}")
-    public ResponseEntity<Category> createCategory(@RequestBody Category category, @PathVariable Long userId) {
-        return ResponseEntity.ok(categoryService.createCategory(category, userId));
+    public ResponseEntity<CategoryResponse> createCategory(
+            @RequestBody CategoryRequest request, // Artık Category entity değil, Request DTO alıyoruz
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(categoryService.createCategory(request, userId));
     }
 
     @DeleteMapping("/{id}")
@@ -32,7 +35,7 @@ public class CategoryController {
     }
 
     @GetMapping("/mandatory")
-    public ResponseEntity<List<Category>> getMandatoryCategories() {
+    public ResponseEntity<List<CategoryResponse>> getMandatoryCategories() {
         return ResponseEntity.ok(categoryService.getMandatoryCategories());
     }
 }

@@ -1,5 +1,6 @@
 package com.moneta.wallet_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.moneta.wallet_service.enums.Currency;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -32,6 +33,7 @@ public class Wallet {
     @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL)
     private List<Transaction> transactions;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

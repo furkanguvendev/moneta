@@ -1,17 +1,18 @@
 package com.moneta.wallet_service.service;
 
-import com.moneta.wallet_service.entity.Category;
+import com.moneta.wallet_service.dto.request.CategoryRequest;
+import com.moneta.wallet_service.dto.response.CategoryResponse;
 import java.util.List;
 
 public interface CategoryService {
 
-    List<Category> getAllCategoriesByUserId(Long userId);
+    List<CategoryResponse> getAllCategoriesByUserId(Long userId);
 
-    Category getCategoryById(Long id);
+    CategoryResponse getCategoryById(Long id);
 
-    Category createCategory(Category category, Long userId);
+    CategoryResponse createCategory(CategoryRequest request, Long userId);
 
     void deleteCategory(Long id);
 
-    List<Category> getMandatoryCategories();
+    List<CategoryResponse> getMandatoryCategories();
 }

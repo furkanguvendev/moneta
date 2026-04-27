@@ -1,5 +1,7 @@
 package com.moneta.wallet_service.service.impl;
 
+import com.moneta.wallet_service.dto.request.WalletRequest;
+import com.moneta.wallet_service.dto.response.WalletResponse;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.repository.WalletRepository;
@@ -18,21 +20,43 @@ public class WalletServiceImpl implements WalletService {
     private final UserService userService;
 
     @Override
-    public Wallet createWallet(Long userId, Wallet wallet) {
+    public WalletResponse createWallet(Long userId, WalletRequest request) {
         User user = userService.getUserById(userId);
+
+        Wallet wallet = new Wallet();
+        wallet.setName(request.name());
+        wallet.setBalance(request.balance());
+        wallet.setCurrency(request.currency());
         wallet.setUser(user);
-        return walletRepository.save(wallet);
+
+        return convertToResponse(walletRepository.save(wallet));
     }
 
     @Override
     public void updateBalance(Long walletId, BigDecimal amount) {
-        Wallet wallet = getWalletById(walletId);
+        Wallet wallet = getWalletEntityById(walletId);
         wallet.setBalance(wallet.getBalance().add(amount));
         walletRepository.save(wallet);
     }
 
     @Override
-    public Wallet getWalletById(Long id) {
-        return walletRepository.findById(id).orElseThrow(()-> new RuntimeException("Cüzdan Bulunamadı."));
+    public WalletResponse getWalletById(Long id) {
+        return convertToResponse(getWalletEntityById(id));
+    }
+
+    @Override
+    public Wallet getWalletEntityById(Long id) {
+        return walletRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cüzdan Bulunamadı. ID: " + id));
+    }
+
+    private WalletResponse convertToResponse(Wallet wallet) {
+        return new WalletResponse(
+                wallet.getId(),
+                wallet.getName(),
+                wallet.getBalance(),
+                wallet.getCurrency(),
+                wallet.getUser().getUserName()
+        );
     }
 }

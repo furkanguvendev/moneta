@@ -1,5 +1,7 @@
 package com.moneta.wallet_service.service.impl;
 
+import com.moneta.wallet_service.dto.request.CategoryRequest;
+import com.moneta.wallet_service.dto.response.CategoryResponse;
 import com.moneta.wallet_service.entity.Category;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.repository.CategoryRepository;
@@ -19,47 +21,73 @@ public class CategoryServiceImpl implements CategoryService {
     private final UserRepository userRepository;
 
     @Override
-    public List<Category> getAllCategoriesByUserId(Long userId) {
-        return categoryRepository.findGlobalAndUserCategories(userId);
+    public List<CategoryResponse> getAllCategoriesByUserId(Long userId) {
+        return categoryRepository.findGlobalAndUserCategories(userId)
+                .stream()
+                .map(this::convertToResponse)
+                .toList();
     }
 
     @Override
-    public Category getCategoryById(Long id) {
-        return categoryRepository.findById(id)
+    public CategoryResponse getCategoryById(Long id) {
+
+        Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Kategori bulunamadı. ID: " + id));
+
+        return convertToResponse(category);
     }
 
     @Override
     @Transactional
-    public Category createCategory(Category category, Long userId) {
+    public CategoryResponse createCategory(CategoryRequest request, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        boolean isDuplicate = categoryRepository.existsByNameAndUserIdIsNull(category.getName()) ||
-                categoryRepository.existsByNameAndUserId(category.getName(), userId);
+        boolean isDuplicate = categoryRepository.existsByNameAndUserIdIsNull(request.name()) ||
+                categoryRepository.existsByNameAndUserId(request.name(), userId);
 
         if (isDuplicate) {
             throw new RuntimeException("Bu isimde bir kategori zaten mevcut.");
         }
 
+        Category category = new Category();
+        category.setName(request.name());
         category.setUser(user);
-        return categoryRepository.save(category);
+
+        category.setMandatory(request.isMandatory());
+
+        category.setDefault(false);
+
+        return convertToResponse(categoryRepository.save(category));
     }
 
     @Override
     @Transactional
     public void deleteCategory(Long id) {
-        Category category = getCategoryById(id);
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Kategori bulunamadı."));
 
-        if (category.getUser() == null || category.isMandatory()) {
-            throw new RuntimeException("Sistem kategorileri silinemez!");
+        if (category.isDefault()) {
+            throw new RuntimeException("Sistem varsayılan kategorileri silinemez!");
         }
 
         categoryRepository.delete(category);
     }
 
     @Override
-    public List<Category> getMandatoryCategories() {
-        return categoryRepository.findByIsMandatoryTrue();
+    public List<CategoryResponse> getMandatoryCategories() {
+        return categoryRepository.findByIsMandatoryTrue()
+                .stream()
+                .map(this::convertToResponse)
+                .toList();
+    }
+
+    private CategoryResponse convertToResponse(Category category) {
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.isMandatory(),
+                category.isDefault()
+        );
     }
 }

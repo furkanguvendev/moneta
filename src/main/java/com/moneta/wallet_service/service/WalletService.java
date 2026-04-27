@@ -1,12 +1,14 @@
 package com.moneta.wallet_service.service;
 
+import com.moneta.wallet_service.dto.request.WalletRequest;
+import com.moneta.wallet_service.dto.response.WalletResponse;
 import com.moneta.wallet_service.entity.Wallet;
 
 import java.math.BigDecimal;
 
 public interface WalletService {
-
-    Wallet createWallet(Long userId, Wallet wallet);
+    WalletResponse createWallet(Long userId, WalletRequest request);
     void updateBalance(Long walletId, BigDecimal amount);
-    Wallet getWalletById(Long id);
+    WalletResponse getWalletById(Long id);
+    Wallet getWalletEntityById(Long id);
 }
