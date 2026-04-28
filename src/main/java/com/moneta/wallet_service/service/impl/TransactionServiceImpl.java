@@ -6,11 +6,14 @@ import com.moneta.wallet_service.entity.Category;
 import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.TransactionType;
+import com.moneta.wallet_service.exception.BaseException;
+import com.moneta.wallet_service.exception.ResourceNotFoundException;
 import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.TransactionService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,19 +31,23 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public TransactionResponse getTransactionById(Long transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("İşlem bulunamadı! ID: " + transactionId));
+                .orElseThrow(() -> new ResourceNotFoundException("İşlem bulunamadı! ID: " + transactionId));
         return convertToResponse(transaction);
     }
 
     @Override
     @Transactional
     public TransactionResponse addTransaction(TransactionRequest request) {
-
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
         Category category = categoryRepository.findById(request.categoryId())
-                .orElseThrow(() -> new RuntimeException("Kategori bulunamadı!"));
+                .orElseThrow(() -> new ResourceNotFoundException("Kategori bulunamadı! ID: " + request.categoryId()));
 
         TransactionType type = TransactionType.valueOf(request.transactionType());
+
+        if (type == TransactionType.EXPENSE && wallet.getBalance().compareTo(request.amount()) < 0) {
+            throw new BaseException("Yetersiz bakiye! Cüzdandaki miktar: " + wallet.getBalance(), HttpStatus.BAD_REQUEST);
+        }
+
         BigDecimal impact = (type == TransactionType.INCOME) ? request.amount() : request.amount().negate();
         walletService.updateBalance(request.walletId(), impact);
 
@@ -56,7 +63,7 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public List<TransactionResponse> getTransactions(Long walletId) {
-        return transactionRepository.findById(walletId)
+        return transactionRepository.findByWalletId(walletId)
                 .stream()
                 .map(this::convertToResponse)
                 .toList();
@@ -66,7 +73,7 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public void deleteTransaction(Long transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Silinecek işlem bulunamadı!"));
+                .orElseThrow(() -> new ResourceNotFoundException("Silinecek işlem bulunamadı! ID: " + transactionId));
 
         BigDecimal reverseImpact = (transaction.getTransactionType() == TransactionType.INCOME)
                 ? transaction.getAmount().negate()

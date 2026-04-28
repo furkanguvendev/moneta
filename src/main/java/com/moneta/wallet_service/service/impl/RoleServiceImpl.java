@@ -2,6 +2,7 @@ package com.moneta.wallet_service.service.impl;
 
 import com.moneta.wallet_service.entity.Role;
 import com.moneta.wallet_service.enums.RoleType;
+import com.moneta.wallet_service.exception.ResourceNotFoundException; // Kendi sınıfımız
 import com.moneta.wallet_service.repository.RoleRepository;
 import com.moneta.wallet_service.service.RoleService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public Role findByType(RoleType type) {
         return roleRepository.findByRoleType(type)
-                .orElseThrow(() -> new RuntimeException("Hata: " + type + " rolü veritabanında bulunamadı. Lütfen elle eklediğinizden emin olun!"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Hata: " + type + " rolü veritabanında bulunamadı! " +
+                                "Lütfen database'e '" + type + "' rolünü eklediğinizden emin olun."
+                ));
     }
 }

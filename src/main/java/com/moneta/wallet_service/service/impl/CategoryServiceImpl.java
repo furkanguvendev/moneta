@@ -4,10 +4,13 @@ import com.moneta.wallet_service.dto.request.CategoryRequest;
 import com.moneta.wallet_service.dto.response.CategoryResponse;
 import com.moneta.wallet_service.entity.Category;
 import com.moneta.wallet_service.entity.User;
+import com.moneta.wallet_service.exception.ResourceNotFoundException; // Kendi sınıfımız
+import com.moneta.wallet_service.exception.BaseException;           // Kendi sınıfımız
 import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +33,8 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryResponse getCategoryById(Long id) {
-
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Kategori bulunamadı. ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Kategori bulunamadı. ID: " + id));
 
         return convertToResponse(category);
     }
@@ -41,21 +43,19 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryResponse createCategory(CategoryRequest request, Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı. ID: " + userId));
 
         boolean isDuplicate = categoryRepository.existsByNameAndUserIdIsNull(request.name()) ||
                 categoryRepository.existsByNameAndUserId(request.name(), userId);
 
         if (isDuplicate) {
-            throw new RuntimeException("Bu isimde bir kategori zaten mevcut.");
+            throw new BaseException("Bu isimde bir kategori zaten mevcut: " + request.name(), HttpStatus.CONFLICT);
         }
 
         Category category = new Category();
         category.setName(request.name());
         category.setUser(user);
-
         category.setMandatory(request.isMandatory());
-
         category.setDefault(false);
 
         return convertToResponse(categoryRepository.save(category));
@@ -65,10 +65,10 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Kategori bulunamadı."));
+                .orElseThrow(() -> new ResourceNotFoundException("Silinmek istenen kategori bulunamadı. ID: " + id));
 
         if (category.isDefault()) {
-            throw new RuntimeException("Sistem varsayılan kategorileri silinemez!");
+            throw new BaseException("Sistem varsayılan kategorileri silinemez!", HttpStatus.BAD_REQUEST);
         }
 
         categoryRepository.delete(category);

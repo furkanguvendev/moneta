@@ -4,6 +4,7 @@ import com.moneta.wallet_service.dto.request.WalletRequest;
 import com.moneta.wallet_service.dto.response.WalletResponse;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
+import com.moneta.wallet_service.exception.ResourceNotFoundException;
 import com.moneta.wallet_service.repository.WalletRepository;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
@@ -46,8 +47,9 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public Wallet getWalletEntityById(Long id) {
+        // RuntimeException -> ResourceNotFoundException (404)
         return walletRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cüzdan Bulunamadı. ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Cüzdan Bulunamadı. ID: " + id));
     }
 
     private WalletResponse convertToResponse(Wallet wallet) {
