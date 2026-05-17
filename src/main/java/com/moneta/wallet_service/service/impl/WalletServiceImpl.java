@@ -9,9 +9,12 @@ import com.moneta.wallet_service.repository.WalletRepository;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +44,18 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
-    public WalletResponse getWalletById(Long id) {
-        return convertToResponse(getWalletEntityById(id));
+    public WalletResponse getWalletById(Long walletId) {
+
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cüzdan bulunamadı."));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        if (!wallet.getUser().getUserName().equals(currentUsername)) {
+            throw new AccessDeniedException("Bu cüzdan bilgilerine erişim yetkiniz yok!");
+        }
+
+        return convertToResponse(wallet);
     }
 
     @Override
@@ -50,6 +63,19 @@ public class WalletServiceImpl implements WalletService {
         // RuntimeException -> ResourceNotFoundException (404)
         return walletRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cüzdan Bulunamadı. ID: " + id));
+    }
+
+    @Override
+    public List<WalletResponse> getWalletsByUsername() {
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        List<Wallet> wallets = walletRepository.findAllByOwnerUsername(currentUsername);
+
+        return wallets.stream()
+                .map(this::convertToResponse)
+                .toList();
+
     }
 
     private WalletResponse convertToResponse(Wallet wallet) {

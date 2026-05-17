@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/wallets")
 @RequiredArgsConstructor
@@ -17,6 +19,11 @@ public class WalletController {
     @GetMapping("/{walletId}")
     public ResponseEntity<WalletResponse> getWallet(@PathVariable Long walletId) {
         return ResponseEntity.ok(walletService.getWalletById(walletId));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<WalletResponse>> getUserWallets() {
+        return ResponseEntity.ok(walletService.getWalletsByUsername());
     }
 
     @PostMapping("/user/{userId}")
