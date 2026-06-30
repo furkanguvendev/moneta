@@ -12,5 +12,5 @@ public interface WalletService {
     void updateBalance(Long walletId, BigDecimal amount);
     WalletResponse getWalletById(Long id);
     Wallet getWalletEntityById(Long id);
-    List<WalletResponse> getWalletsByUsername();
+    List<WalletResponse> getWalletsByUserId(Long userId);
 }

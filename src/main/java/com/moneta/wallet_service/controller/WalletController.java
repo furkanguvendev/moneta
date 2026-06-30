@@ -21,9 +21,9 @@ public class WalletController {
         return ResponseEntity.ok(walletService.getWalletById(walletId));
     }
 
-    @GetMapping
-    public ResponseEntity<List<WalletResponse>> getUserWallets() {
-        return ResponseEntity.ok(walletService.getWalletsByUsername());
+    @GetMapping("/{userId}")
+    public ResponseEntity<List<WalletResponse>> getUserWallets(@PathVariable Long userId) {
+        return ResponseEntity.ok(walletService.getWalletsByUserId(userId));
     }
 
     @PostMapping("/user/{userId}")
