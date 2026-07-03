@@ -1,8 +1,6 @@
 package com.moneta.wallet_service.controller;
 
-import com.moneta.wallet_service.dto.request.UserRequest;
 import com.moneta.wallet_service.dto.response.UserResponse;
-import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
