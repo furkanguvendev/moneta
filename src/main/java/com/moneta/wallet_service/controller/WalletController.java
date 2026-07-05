@@ -4,6 +4,7 @@ import com.moneta.wallet_service.dto.request.WalletRequest;
 import com.moneta.wallet_service.dto.response.WalletResponse;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,12 +17,12 @@ public class WalletController {
 
     private final WalletService walletService;
 
-    @GetMapping("/{walletId}")
+    @GetMapping("/detail/{walletId}")
     public ResponseEntity<WalletResponse> getWallet(@PathVariable Long walletId) {
         return ResponseEntity.ok(walletService.getWalletById(walletId));
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping("/user/{userId}")
     public ResponseEntity<List<WalletResponse>> getUserWallets(@PathVariable Long userId) {
         return ResponseEntity.ok(walletService.getWalletsByUserId(userId));
     }
@@ -30,6 +31,6 @@ public class WalletController {
     public ResponseEntity<WalletResponse> createWallet(
             @PathVariable Long userId,
             @RequestBody WalletRequest request) {
-        return ResponseEntity.ok(walletService.createWallet(userId, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(walletService.createWallet(userId, request));
     }
 }

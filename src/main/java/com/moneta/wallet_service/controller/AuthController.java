@@ -6,9 +6,9 @@ import com.moneta.wallet_service.dto.response.LoginResponse;
 import com.moneta.wallet_service.entity.Role;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.enums.RoleType;
-import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.service.JwtService;
-import com.moneta.wallet_service.service.RoleService; // Yeni ekledik
+import com.moneta.wallet_service.service.RoleService;
+import com.moneta.wallet_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final RoleService roleService;
     private final JwtService jwtService;
@@ -37,12 +37,13 @@ public class AuthController {
         Authentication onayliKullanici = authenticationManager.authenticate(authBileti);
 
         if (onayliKullanici.isAuthenticated()) {
-
             String token = jwtService.generateToken(loginRequest.getEmail());
+            User user = userService.getUserByUsernameOrEmail(loginRequest.getEmail());
 
             LoginResponse response = new LoginResponse(
-                    onayliKullanici.getName(),
-                    loginRequest.getEmail(),
+                    user.getId(),
+                    user.getUserName(),
+                    user.getEmail(),
                     token,
                     "Giriş başarıyla tamamlandı!"
             );
@@ -64,8 +65,6 @@ public class AuthController {
 
         Role defaultRole = roleService.findByType(RoleType.USER);
         user.getRoles().add(defaultRole);
-
-        userRepository.save(user);
 
         return new AuthResponse(
                 user.getUserName(),

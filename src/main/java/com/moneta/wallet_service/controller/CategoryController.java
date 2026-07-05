@@ -23,7 +23,7 @@ public class CategoryController {
 
     @PostMapping("/user/{userId}")
     public ResponseEntity<CategoryResponse> createCategory(
-            @RequestBody CategoryRequest request, // Artık Category entity değil, Request DTO alıyoruz
+            @RequestBody CategoryRequest request,
             @PathVariable Long userId) {
         return ResponseEntity.ok(categoryService.createCategory(request, userId));
     }

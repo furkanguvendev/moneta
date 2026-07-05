@@ -21,14 +21,18 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(Long id) {
-
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı. ID: " + id));
     }
 
     @Override
-    public void deleteUser(Long userId) {
+    public User getUserByUsernameOrEmail(String usernameOrEmail) {
+        return userRepository.findByUserNameOrEmail(usernameOrEmail, usernameOrEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı: " + usernameOrEmail));
+    }
 
+    @Override
+    public void deleteUser(Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("Silinmek istenen kullanıcı bulunamadı. ID: " + userId);
         }
