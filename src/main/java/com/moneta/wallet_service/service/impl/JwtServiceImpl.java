@@ -16,7 +16,6 @@ public class JwtServiceImpl implements JwtService {
     private final String SECRET_STRING = "moneta_wallet_service_secret_key_123456789";
     private final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET_STRING.getBytes());
 
-    // Token içinden email adresini çeker
     @Override
     public String extractUsername(String token) {
         return Jwts.parserBuilder()
@@ -38,7 +37,7 @@ public class JwtServiceImpl implements JwtService {
         return Jwts.builder()
                 .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7))
                 .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
                 .compact();
     }

@@ -1,5 +1,6 @@
 package com.moneta.wallet_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -26,7 +27,8 @@ public class Category {
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
     private List<Transaction> transactions;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = true)
+    @JsonIgnore
     private User user;
 }
