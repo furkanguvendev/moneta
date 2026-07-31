@@ -11,6 +11,7 @@ import com.moneta.wallet_service.exception.BaseException;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
 import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.TransactionRepository;
+import com.moneta.wallet_service.service.InvestmentSimulationService;
 import com.moneta.wallet_service.service.TransactionService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +30,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
     private final WalletService walletService;
     private final CategoryRepository categoryRepository;
+    private final InvestmentSimulationService investmentSimulationService;
 
     @Override
     public TransactionResponse getTransactionById(Long transactionId) {
@@ -78,6 +78,10 @@ public class TransactionServiceImpl implements TransactionService {
     public void deleteTransaction(Long transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Silinecek işlem bulunamadı! ID: " + transactionId));
+
+        if (transaction.getInvestmentSimulationId() != null) {
+            investmentSimulationService.deleteSimulationById(transaction.getInvestmentSimulationId());
+        }
 
         BigDecimal reverseImpact = (transaction.getTransactionType() == TransactionType.INCOME)
                 ? transaction.getAmount().negate()

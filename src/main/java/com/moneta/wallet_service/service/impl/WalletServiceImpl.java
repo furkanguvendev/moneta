@@ -4,11 +4,13 @@ import com.moneta.wallet_service.dto.request.WalletRequest;
 import com.moneta.wallet_service.dto.response.WalletResponse;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
+import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
 import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.repository.WalletRepository;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -71,6 +73,22 @@ public class WalletServiceImpl implements WalletService {
         return wallets.stream()
                 .map(this::convertToResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void updateBalanceAfterTransactionDelete(Long walletId, BigDecimal amount, TransactionType type) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new RuntimeException("Cüzdan bulunamadı: " + walletId));
+
+        // Silinen işlem GELİR ise cüzdandan düşüyoruz, GİDER ise cüzdana geri ekliyoruz
+        if (type == TransactionType.INCOME) {
+            wallet.setBalance(wallet.getBalance().subtract(amount));
+        } else if (type == TransactionType.EXPENSE) {
+            wallet.setBalance(wallet.getBalance().add(amount));
+        }
+
+        walletRepository.save(wallet);
     }
 
     private WalletResponse convertToResponse(Wallet wallet) {

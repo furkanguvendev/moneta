@@ -2,7 +2,10 @@ package com.moneta.wallet_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -11,7 +14,10 @@ import java.util.Set;
 
 @Entity
 @Table(name = "users")
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"wallets", "categories", "roles"})
+@EqualsAndHashCode(exclude = {"wallets", "categories", "roles"})
 public class User {
 
     @Id

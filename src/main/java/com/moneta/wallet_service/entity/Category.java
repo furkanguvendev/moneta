@@ -2,13 +2,19 @@ package com.moneta.wallet_service.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 
 import java.util.List;
 
 @Entity
 @Table(name = "category")
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"user", "transactions"})
+@EqualsAndHashCode(exclude = {"user", "transactions"})
 public class Category {
 
     @Id

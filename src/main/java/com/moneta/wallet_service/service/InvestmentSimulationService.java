@@ -9,4 +9,5 @@ public interface InvestmentSimulationService {
     List<InvestmentSimulation> getActiveSimulations(Long userId);
     InvestmentSimulation createSimulation(Long userId, SimulationRequest request);
     InvestmentSimulation closeOrCancelSimulation(Long id, Long userId, SimulationCloseRequest request);
+    void deleteSimulationById(Long id);
 }

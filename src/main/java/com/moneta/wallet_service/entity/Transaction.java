@@ -34,4 +34,7 @@ public class Transaction {
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    @Column(name = "investment_simulation_id", nullable = true)
+    private Long investmentSimulationId;
 }

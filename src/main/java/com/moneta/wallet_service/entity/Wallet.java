@@ -3,7 +3,10 @@ package com.moneta.wallet_service.entity;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.moneta.wallet_service.enums.Currency;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,7 +14,10 @@ import java.util.List;
 
 @Entity
 @Table(name="wallets")
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"user", "transactions"})
+@EqualsAndHashCode(exclude = {"user", "transactions"})
 public class Wallet {
 
     @Id

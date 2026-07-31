@@ -14,4 +14,5 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             "WHERE t.wallet.id = :walletId AND t.transactionType = 'EXPENSE' " +
             "GROUP BY t.category.name")
     List<Object[]> getExpenceBreakdownByCategory(Long walletId);
+    List<Transaction> findByInvestmentSimulationId(Long investmentSimulationId);
 }

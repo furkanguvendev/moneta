@@ -3,12 +3,15 @@ package com.moneta.wallet_service.service.impl;
 import com.moneta.wallet_service.dto.request.SimulationCloseRequest;
 import com.moneta.wallet_service.dto.request.SimulationRequest;
 import com.moneta.wallet_service.entity.InvestmentSimulation;
+import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.InvestmentType;
 import com.moneta.wallet_service.enums.SimulationStatus;
+import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
+import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.InvestmentSimulationRepository;
-import com.moneta.wallet_service.repository.WalletRepository;
+import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.InvestmentSimulationService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -27,7 +31,8 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
 
     private final InvestmentSimulationRepository simulationRepository;
     private final WalletService walletService;
-    private final WalletRepository walletRepository;
+    private final TransactionRepository transactionRepository;
+    private final CategoryRepository categoryRepository;
 
     @Override
     public List<InvestmentSimulation> getActiveSimulations(Long userId) {
@@ -40,14 +45,9 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
 
         if (wallet.getBalance().compareTo(request.amount()) < 0) {
-            throw new RuntimeException("Cüzdanda simülasyon başlatacak kadar yeterli bakiye yok!");
+            throw new RuntimeException("Cüzdandaki bakiye simülasyon başlatmak için yetersiz!");
         }
 
-        // 1. Cüzdan Bakiyesini Güncelle
-        wallet.setBalance(wallet.getBalance().subtract(request.amount()));
-        walletRepository.saveAndFlush(wallet);
-
-        // 2. Simülasyon Kaydını Oluştur
         InvestmentSimulation simulation = new InvestmentSimulation();
         simulation.setUserId(userId);
         simulation.setWalletId(request.walletId());
@@ -58,7 +58,23 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         simulation.setEndDate(LocalDate.now().plusDays(30));
         simulation.setStatus(SimulationStatus.ACTIVE);
 
-        return simulationRepository.save(simulation);
+        InvestmentSimulation savedSimulation = simulationRepository.save(simulation);
+
+        walletService.updateBalance(request.walletId(), request.amount().negate());
+
+        Transaction transaction = new Transaction();
+        transaction.setWallet(wallet);
+        transaction.setAmount(request.amount());
+        transaction.setTransactionType(TransactionType.EXPENSE);
+        transaction.setDescription("Yatırım Simülasyonu Başlatıldı: " + request.investmentType().name());
+        transaction.setTransactionDate(LocalDateTime.now());
+        transaction.setInvestmentSimulationId(savedSimulation.getId());
+
+        categoryRepository.findById(1L).ifPresent(transaction::setCategory);
+
+        transactionRepository.save(transaction);
+
+        return savedSimulation;
     }
 
     @Override
@@ -80,24 +96,34 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
 
         BigDecimal profitOrLoss = BigDecimal.ZERO;
 
-        // Aynı gün kapatmalarda getiri hesaplama (passedDays > 0 kuralı)
         if (passedDays > 0) {
             if (simulation.getInvestmentType() == InvestmentType.FAIZ) {
                 BigDecimal annualRate = simulation.getEntryValue().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
                 BigDecimal daysRatio = BigDecimal.valueOf(passedDays).divide(BigDecimal.valueOf(365), 4, RoundingMode.HALF_UP);
                 profitOrLoss = simulation.getAmount().multiply(annualRate).multiply(daysRatio);
-            } else {
+            } else if (request.currentEvValue() != null && simulation.getEntryValue().compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal count = simulation.getAmount().divide(simulation.getEntryValue(), 6, RoundingMode.HALF_UP);
                 BigDecimal currentTotal = count.multiply(request.currentEvValue());
                 profitOrLoss = currentTotal.subtract(simulation.getAmount());
             }
         }
 
-        Wallet wallet = walletService.getWalletEntityById(simulation.getWalletId());
         BigDecimal returnAmount = simulation.getAmount().add(profitOrLoss);
 
-        wallet.setBalance(wallet.getBalance().add(returnAmount));
-        walletRepository.saveAndFlush(wallet);
+        walletService.updateBalance(simulation.getWalletId(), returnAmount);
+
+        Wallet wallet = walletService.getWalletEntityById(simulation.getWalletId());
+        Transaction closeTx = new Transaction();
+        closeTx.setWallet(wallet);
+        closeTx.setAmount(returnAmount);
+        closeTx.setTransactionType(TransactionType.INCOME);
+        closeTx.setDescription("Yatırım Simülasyonu Kapatıldı: " + simulation.getInvestmentType().name());
+        closeTx.setTransactionDate(LocalDateTime.now());
+        closeTx.setInvestmentSimulationId(simulation.getId());
+
+        categoryRepository.findById(1L).ifPresent(closeTx::setCategory);
+
+        transactionRepository.save(closeTx);
 
         if (now.isAfter(simulation.getEndDate()) || now.isEqual(simulation.getEndDate())) {
             simulation.setStatus(SimulationStatus.COMPLETED);
@@ -106,5 +132,22 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         }
 
         return simulationRepository.save(simulation);
+    }
+
+    @Override
+    @Transactional
+    public void deleteSimulationById(Long id) {
+        InvestmentSimulation simulation = simulationRepository.findById(id).orElse(null);
+
+        if (simulation != null) {
+            List<Transaction> transactions = transactionRepository.findByInvestmentSimulationId(id);
+            if (!transactions.isEmpty()) {
+                transactionRepository.deleteAll(transactions);
+            }
+
+            walletService.updateBalance(simulation.getWalletId(), simulation.getAmount());
+
+            simulationRepository.delete(simulation);
+        }
     }
 }
