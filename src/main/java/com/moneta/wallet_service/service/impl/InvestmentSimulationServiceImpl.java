@@ -6,6 +6,7 @@ import com.moneta.wallet_service.entity.InvestmentSimulation;
 import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.InvestmentType;
+import com.moneta.wallet_service.enums.MaturityType;
 import com.moneta.wallet_service.enums.SimulationStatus;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
@@ -53,9 +54,23 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         simulation.setWalletId(request.walletId());
         simulation.setAmount(request.amount());
         simulation.setInvestmentType(request.investmentType());
+        simulation.setMaturityType(request.maturityType());
         simulation.setEntryValue(request.entryValue());
-        simulation.setStartDate(LocalDate.now());
-        simulation.setEndDate(LocalDate.now().plusDays(30));
+
+        LocalDate now = LocalDate.now();
+        simulation.setStartDate(now);
+
+        // Vade tipine göre endDate belirleme
+        if (request.investmentType() == InvestmentType.FAIZ && request.maturityType() != null) {
+            switch (request.maturityType()) {
+                case GUNLUK -> simulation.setEndDate(now.plusDays(1));
+                case AYLIK -> simulation.setEndDate(now.plusMonths(1));
+                case YILLIK -> simulation.setEndDate(now.plusYears(1));
+            }
+        } else {
+            simulation.setEndDate(now.plusDays(30)); // Varsayılan süre
+        }
+
         simulation.setStatus(SimulationStatus.ACTIVE);
 
         InvestmentSimulation savedSimulation = simulationRepository.save(simulation);
@@ -92,23 +107,21 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         }
 
         LocalDate now = LocalDate.now();
-        long passedDays = ChronoUnit.DAYS.between(simulation.getStartDate(), now);
+        BigDecimal returnAmount = simulation.getAmount();
 
-        BigDecimal profitOrLoss = BigDecimal.ZERO;
-
-        if (passedDays > 0) {
-            if (simulation.getInvestmentType() == InvestmentType.FAIZ) {
-                BigDecimal annualRate = simulation.getEntryValue().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-                BigDecimal daysRatio = BigDecimal.valueOf(passedDays).divide(BigDecimal.valueOf(365), 4, RoundingMode.HALF_UP);
-                profitOrLoss = simulation.getAmount().multiply(annualRate).multiply(daysRatio);
-            } else if (request.currentEvValue() != null && simulation.getEntryValue().compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal count = simulation.getAmount().divide(simulation.getEntryValue(), 6, RoundingMode.HALF_UP);
-                BigDecimal currentTotal = count.multiply(request.currentEvValue());
-                profitOrLoss = currentTotal.subtract(simulation.getAmount());
+        if (simulation.getInvestmentType() == InvestmentType.FAIZ) {
+            long passedDays = ChronoUnit.DAYS.between(simulation.getStartDate(), now);
+            if (passedDays > 0) {
+                // Günlük basit faiz hesabı: Anapara * (Faiz / 100) * (Geçen Gün / 365)
+                BigDecimal annualRate = simulation.getEntryValue().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+                BigDecimal daysRatio = BigDecimal.valueOf(passedDays).divide(BigDecimal.valueOf(365), 8, RoundingMode.HALF_UP);
+                BigDecimal profit = simulation.getAmount().multiply(annualRate).multiply(daysRatio);
+                returnAmount = simulation.getAmount().add(profit).setScale(2, RoundingMode.HALF_UP);
             }
+        } else if (request.currentEvValue() != null && simulation.getEntryValue().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal unitCount = simulation.getAmount().divide(simulation.getEntryValue(), 8, RoundingMode.HALF_UP);
+            returnAmount = unitCount.multiply(request.currentEvValue()).setScale(2, RoundingMode.HALF_UP);
         }
-
-        BigDecimal returnAmount = simulation.getAmount().add(profitOrLoss);
 
         walletService.updateBalance(simulation.getWalletId(), returnAmount);
 
@@ -141,11 +154,24 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
 
         if (simulation != null) {
             List<Transaction> transactions = transactionRepository.findByInvestmentSimulationId(id);
+
+            BigDecimal netAdjustment = BigDecimal.ZERO;
+
+            for (Transaction tx : transactions) {
+                if (tx.getTransactionType() == TransactionType.EXPENSE) {
+                    netAdjustment = netAdjustment.add(tx.getAmount());
+                } else if (tx.getTransactionType() == TransactionType.INCOME) {
+                    netAdjustment = netAdjustment.subtract(tx.getAmount());
+                }
+            }
+
             if (!transactions.isEmpty()) {
                 transactionRepository.deleteAll(transactions);
             }
 
-            walletService.updateBalance(simulation.getWalletId(), simulation.getAmount());
+            if (netAdjustment.compareTo(BigDecimal.ZERO) != 0) {
+                walletService.updateBalance(simulation.getWalletId(), netAdjustment);
+            }
 
             simulationRepository.delete(simulation);
         }

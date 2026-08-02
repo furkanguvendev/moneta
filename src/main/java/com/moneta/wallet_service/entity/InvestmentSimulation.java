@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.entity;
 
 import com.moneta.wallet_service.enums.InvestmentType;
+import com.moneta.wallet_service.enums.MaturityType;
 import com.moneta.wallet_service.enums.SimulationStatus;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -28,6 +29,10 @@ public class InvestmentSimulation {
     @Enumerated(EnumType.STRING)
     @Column(name = "investment_type", nullable = false)
     private InvestmentType investmentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "maturity_type")
+    private MaturityType maturityType;
 
     @Column(name = "entry_value", nullable = false)
     private BigDecimal entryValue;

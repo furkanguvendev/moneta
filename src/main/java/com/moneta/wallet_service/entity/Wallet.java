@@ -36,7 +36,7 @@ public class Wallet {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Transaction> transactions;
 
     @JsonBackReference

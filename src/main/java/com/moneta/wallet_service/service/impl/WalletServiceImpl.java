@@ -91,6 +91,14 @@ public class WalletServiceImpl implements WalletService {
         walletRepository.save(wallet);
     }
 
+    @Override
+    @Transactional
+    public void deleteWallet(Long walletId) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cüzdan bulunamadı! ID: " + walletId));
+        walletRepository.delete(wallet);
+    }
+
     private WalletResponse convertToResponse(Wallet wallet) {
         return new WalletResponse(
                 wallet.getId(),

@@ -81,6 +81,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         if (transaction.getInvestmentSimulationId() != null) {
             investmentSimulationService.deleteSimulationById(transaction.getInvestmentSimulationId());
+            return;
         }
 
         BigDecimal reverseImpact = (transaction.getTransactionType() == TransactionType.INCOME)

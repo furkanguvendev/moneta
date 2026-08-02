@@ -15,4 +15,5 @@ public interface WalletService {
     Wallet getWalletEntityById(Long id);
     List<WalletResponse> getWalletsByUserId(Long userId);
     void updateBalanceAfterTransactionDelete(Long walletId, BigDecimal amount, TransactionType type);
+    void deleteWallet(Long walletId);
 }

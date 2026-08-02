@@ -33,4 +33,10 @@ public class WalletController {
             @RequestBody WalletRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(walletService.createWallet(userId, request));
     }
+
+    @DeleteMapping("/{walletId}")
+    public ResponseEntity<Void> deleteWallet(@PathVariable Long walletId) {
+        walletService.deleteWallet(walletId);
+        return ResponseEntity.noContent().build();
+    }
 }
