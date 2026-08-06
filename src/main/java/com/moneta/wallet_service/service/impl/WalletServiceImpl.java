@@ -35,6 +35,7 @@ public class WalletServiceImpl implements WalletService {
         wallet.setBalance(request.balance());
         wallet.setCurrency(request.currency());
         wallet.setUser(user);
+        wallet.getCreatedAt();
 
         return convertToResponse(walletRepository.save(wallet));
     }
@@ -81,7 +82,6 @@ public class WalletServiceImpl implements WalletService {
         Wallet wallet = walletRepository.findById(walletId)
                 .orElseThrow(() -> new RuntimeException("Cüzdan bulunamadı: " + walletId));
 
-        // Silinen işlem GELİR ise cüzdandan düşüyoruz, GİDER ise cüzdana geri ekliyoruz
         if (type == TransactionType.INCOME) {
             wallet.setBalance(wallet.getBalance().subtract(amount));
         } else if (type == TransactionType.EXPENSE) {
@@ -105,7 +105,8 @@ public class WalletServiceImpl implements WalletService {
                 wallet.getName(),
                 wallet.getBalance(),
                 wallet.getCurrency(),
-                wallet.getUser().getUserName()
+                wallet.getUser().getUserName(),
+                wallet.getCreatedAt()
         );
     }
 }
