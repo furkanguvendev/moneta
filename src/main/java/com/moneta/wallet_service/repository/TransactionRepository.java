@@ -47,4 +47,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("month") int month,
             @Param("year") int year
     );
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE t.wallet.id = :walletId " +
+            "AND t.transactionType = :type " +
+            "AND MONTH(t.transactionDate) = :month " +
+            "AND YEAR(t.transactionDate) = :year")
+    BigDecimal findMonthlyTotalByWalletIdAndType(
+            @Param("walletId") Long walletId,
+            @Param("type") TransactionType type,
+            @Param("month") int month,
+            @Param("year") int year
+    );
 }
