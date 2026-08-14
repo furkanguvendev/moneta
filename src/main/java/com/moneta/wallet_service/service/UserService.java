@@ -7,5 +7,6 @@ public interface UserService {
     UserResponse getUserProfile(Long id);
     User getUserById(Long id);
     User getUserByUsernameOrEmail(String usernameOrEmail);
+    User saveUser(User user);
     void deleteUser(Long userId);
 }

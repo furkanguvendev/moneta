@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.service.impl;
 
 import com.moneta.wallet_service.service.JwtService;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -9,6 +10,10 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 @Service
 public class JwtServiceImpl implements JwtService {
@@ -18,12 +23,18 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    @Override
+    public List<String> extractRoles(String token) {
+        List<?> roles = extractClaim(token, claims -> claims.get("roles", List.class));
+        if (roles != null) {
+            return roles.stream()
+                    .map(Object::toString)
+                    .toList();
+        }
+        return List.of();
     }
 
     @Override
@@ -33,8 +44,19 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
+    public boolean isTokenValid(String token) {
+        return !isTokenExpired(token);
+    }
+
+    @Override
     public String generateToken(String email) {
+        return generateToken(new HashMap<>(), email);
+    }
+
+    @Override
+    public String generateToken(Map<String, Object> extraClaims, String email) {
         return Jwts.builder()
+                .setClaims(extraClaims)
                 .setSubject(email)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7))
@@ -42,13 +64,24 @@ public class JwtServiceImpl implements JwtService {
                 .compact();
     }
 
-    private boolean isTokenExpired(String token) {
-        Date expiration = Jwts.parserBuilder()
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
                 .setSigningKey(SECRET_KEY)
                 .build()
                 .parseClaimsJws(token)
-                .getBody()
-                .getExpiration();
-        return expiration.before(new Date());
+                .getBody();
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    private Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
     }
 }

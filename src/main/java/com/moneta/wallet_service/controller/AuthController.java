@@ -18,6 +18,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -37,8 +41,15 @@ public class AuthController {
         Authentication onayliKullanici = authenticationManager.authenticate(authBileti);
 
         if (onayliKullanici.isAuthenticated()) {
-            String token = jwtService.generateToken(loginRequest.getEmail());
             User user = userService.getUserByUsernameOrEmail(loginRequest.getEmail());
+
+            Map<String, Object> extraClaims = new HashMap<>();
+            List<String> roles = user.getRoles().stream()
+                    .map(role -> role.getRoleType().name())
+                    .toList();
+            extraClaims.put("roles", roles);
+
+            String token = jwtService.generateToken(extraClaims, loginRequest.getEmail());
 
             LoginResponse response = new LoginResponse(
                     user.getId(),
@@ -55,7 +66,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(@RequestBody User register) {
+    public ResponseEntity<AuthResponse> register(@RequestBody User register) {
         User user = new User();
         user.setUserName(register.getUserName());
         user.setEmail(register.getEmail());
@@ -66,10 +77,14 @@ public class AuthController {
         Role defaultRole = roleService.findByType(RoleType.USER);
         user.getRoles().add(defaultRole);
 
-        return new AuthResponse(
-                user.getUserName(),
-                user.getEmail(),
-                encodedPassword
+        User savedUser = userService.saveUser(user);
+
+        AuthResponse response = new AuthResponse(
+                savedUser.getUserName(),
+                savedUser.getEmail(),
+                "Kayıt işlemi başarıyla tamamlandı."
         );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

@@ -1,5 +1,6 @@
 package com.moneta.wallet_service.service.impl;
 
+import com.moneta.wallet_service.dto.response.MonthlyBreakdownResponse;
 import com.moneta.wallet_service.dto.response.MonthlySummaryResponse;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.repository.TransactionRepository;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class AnalyticsServiceImpl implements AnalyticsService {
@@ -48,5 +50,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         );
 
         return new MonthlySummaryResponse(totalIncome, totalExpense);
+    }
+
+    @Override
+    public List<MonthlyBreakdownResponse> getWalletMonthlyBreakdown(Long walletId) {
+        return transactionRepository.findMonthlyBreakdownByWalletId(walletId);
     }
 }
