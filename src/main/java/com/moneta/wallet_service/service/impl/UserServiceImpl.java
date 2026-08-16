@@ -44,6 +44,12 @@ public class UserServiceImpl implements UserService {
         return userRepository.save(user);
     }
 
+    @Override
+    public User getUserByUsernameOrEmailWithRoles(String usernameOrEmail) {
+        return userRepository.findByUserNameOrEmailWithRoles(usernameOrEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı: " + usernameOrEmail));
+    }
+
     private UserResponse convertToResponse(User user) {
         return new UserResponse(
                 user.getId(),

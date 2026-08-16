@@ -6,7 +6,6 @@ import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
-import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.repository.WalletRepository;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
@@ -70,7 +69,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public List<WalletResponse> getWalletsByUserId(Long userId) {
-        List<Wallet> wallets = walletRepository.findAllByUserId(userId);
+        List<Wallet> wallets = walletRepository.findAllByUserIdWithUser(userId);
         return wallets.stream()
                 .map(this::convertToResponse)
                 .toList();

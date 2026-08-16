@@ -41,7 +41,7 @@ public class AuthController {
         Authentication onayliKullanici = authenticationManager.authenticate(authBileti);
 
         if (onayliKullanici.isAuthenticated()) {
-            User user = userService.getUserByUsernameOrEmail(loginRequest.getEmail());
+            User user = userService.getUserByUsernameOrEmailWithRoles(loginRequest.getEmail());
 
             Map<String, Object> extraClaims = new HashMap<>();
             List<String> roles = user.getRoles().stream()

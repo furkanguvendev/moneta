@@ -26,13 +26,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         int currentMonth = now.getMonthValue();
         int currentYear = now.getYear();
 
-        BigDecimal income = transactionRepository.findTotalIncomeByUserIdAndMonthAndYear(userId, currentMonth, currentYear);
-        BigDecimal expense = transactionRepository.findTotalExpenseByUserIdAndMonthAndYear(userId, currentMonth, currentYear);
-
-        return new MonthlySummaryResponse(
-                income != null ? income : BigDecimal.ZERO,
-                expense != null ? expense : BigDecimal.ZERO
-        );
+        MonthlySummaryResponse summary = transactionRepository.findMonthlySummaryByUserIdAndMonthAndYear(userId, currentMonth, currentYear);
+        return summary != null ? summary : new MonthlySummaryResponse(BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     @Override
@@ -49,7 +44,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 walletId, TransactionType.EXPENSE, currentMonth, currentYear
         );
 
-        return new MonthlySummaryResponse(totalIncome, totalExpense);
+        return new MonthlySummaryResponse(
+                totalIncome != null ? totalIncome : BigDecimal.ZERO,
+                totalExpense != null ? totalExpense : BigDecimal.ZERO
+        );
     }
 
     @Override
