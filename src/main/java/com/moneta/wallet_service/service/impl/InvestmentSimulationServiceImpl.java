@@ -2,14 +2,15 @@ package com.moneta.wallet_service.service.impl;
 
 import com.moneta.wallet_service.dto.request.SimulationCloseRequest;
 import com.moneta.wallet_service.dto.request.SimulationRequest;
+import com.moneta.wallet_service.dto.response.SimulationResponse;
 import com.moneta.wallet_service.entity.InvestmentSimulation;
 import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.InvestmentType;
-import com.moneta.wallet_service.enums.MaturityType;
 import com.moneta.wallet_service.enums.SimulationStatus;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
+import com.moneta.wallet_service.mapper.SimulationMapper;
 import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.InvestmentSimulationRepository;
 import com.moneta.wallet_service.repository.TransactionRepository;
@@ -34,33 +35,26 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
     private final WalletService walletService;
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
+    private final SimulationMapper simulationMapper;
 
     @Override
-    public List<InvestmentSimulation> getActiveSimulations(Long userId) {
-        return simulationRepository.findByUserIdAndStatus(userId, SimulationStatus.ACTIVE);
+    public List<SimulationResponse> getActiveSimulations(Long userId) {
+        List<InvestmentSimulation> list = simulationRepository.findByUserIdAndStatus(userId, SimulationStatus.ACTIVE);
+        return list.stream().map(sim -> simulationMapper.toResponse(sim, sim.getEntryValue())).toList();
     }
 
     @Override
     @Transactional
-    public InvestmentSimulation createSimulation(Long userId, SimulationRequest request) {
+    public SimulationResponse createSimulation(Long userId, SimulationRequest request) {
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
 
         if (wallet.getBalance().compareTo(request.amount()) < 0) {
             throw new RuntimeException("Cüzdandaki bakiye simülasyon başlatmak için yetersiz!");
         }
 
-        InvestmentSimulation simulation = new InvestmentSimulation();
-        simulation.setUserId(userId);
-        simulation.setWalletId(request.walletId());
-        simulation.setAmount(request.amount());
-        simulation.setInvestmentType(request.investmentType());
-        simulation.setMaturityType(request.maturityType());
-        simulation.setEntryValue(request.entryValue());
+        InvestmentSimulation simulation = simulationMapper.toEntity(request, userId);
 
         LocalDate now = LocalDate.now();
-        simulation.setStartDate(now);
-
-        // Vade tipine göre endDate belirleme
         if (request.investmentType() == InvestmentType.FAIZ && request.maturityType() != null) {
             switch (request.maturityType()) {
                 case GUNLUK -> simulation.setEndDate(now.plusDays(1));
@@ -68,10 +62,8 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
                 case YILLIK -> simulation.setEndDate(now.plusYears(1));
             }
         } else {
-            simulation.setEndDate(now.plusDays(30)); // Varsayılan süre
+            simulation.setEndDate(now.plusDays(30));
         }
-
-        simulation.setStatus(SimulationStatus.ACTIVE);
 
         InvestmentSimulation savedSimulation = simulationRepository.save(simulation);
 
@@ -86,17 +78,15 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         transaction.setInvestmentSimulationId(savedSimulation.getId());
 
         categoryRepository.findById(1L).ifPresent(transaction::setCategory);
-
         transactionRepository.save(transaction);
 
-        return savedSimulation;
+        return simulationMapper.toResponse(savedSimulation, savedSimulation.getEntryValue());
     }
 
     @Override
     @Transactional
-    public InvestmentSimulation closeOrCancelSimulation(Long id, Long userId, SimulationCloseRequest request) {
-        InvestmentSimulation simulation = simulationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Simülasyon bulunamadı! ID: " + id));
+    public SimulationResponse closeOrCancelSimulation(Long id, Long userId, SimulationCloseRequest request) {
+        InvestmentSimulation simulation = getSimulationEntityById(id);
 
         if (!simulation.getUserId().equals(userId)) {
             throw new RuntimeException("Bu simülasyon üzerinde işlem yapma yetkiniz yok!");
@@ -112,7 +102,6 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         if (simulation.getInvestmentType() == InvestmentType.FAIZ) {
             long passedDays = ChronoUnit.DAYS.between(simulation.getStartDate(), now);
             if (passedDays > 0) {
-                // Günlük basit faiz hesabı: Anapara * (Faiz / 100) * (Geçen Gün / 365)
                 BigDecimal annualRate = simulation.getEntryValue().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
                 BigDecimal daysRatio = BigDecimal.valueOf(passedDays).divide(BigDecimal.valueOf(365), 8, RoundingMode.HALF_UP);
                 BigDecimal profit = simulation.getAmount().multiply(annualRate).multiply(daysRatio);
@@ -135,7 +124,6 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         closeTx.setInvestmentSimulationId(simulation.getId());
 
         categoryRepository.findById(1L).ifPresent(closeTx::setCategory);
-
         transactionRepository.save(closeTx);
 
         if (now.isAfter(simulation.getEndDate()) || now.isEqual(simulation.getEndDate())) {
@@ -144,7 +132,13 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
             simulation.setStatus(SimulationStatus.CANCELLED);
         }
 
-        return simulationRepository.save(simulation);
+        return simulationMapper.toResponse(simulationRepository.save(simulation), request.currentEvValue());
+    }
+
+    @Override
+    public InvestmentSimulation getSimulationEntityById(Long id) {
+        return simulationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Simülasyon bulunamadı! ID: " + id));
     }
 
     @Override
@@ -154,7 +148,6 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
 
         if (simulation != null) {
             List<Transaction> transactions = transactionRepository.findByInvestmentSimulationId(id);
-
             BigDecimal netAdjustment = BigDecimal.ZERO;
 
             for (Transaction tx : transactions) {

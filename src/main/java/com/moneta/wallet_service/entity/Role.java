@@ -2,10 +2,15 @@ package com.moneta.wallet_service.entity;
 
 import com.moneta.wallet_service.enums.RoleType;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Data
+@Table(name = "roles")
+@Getter
+@Setter
+@EqualsAndHashCode
 public class Role {
 
     @Id

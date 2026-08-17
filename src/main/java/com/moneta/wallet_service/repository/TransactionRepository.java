@@ -7,10 +7,13 @@ import com.moneta.wallet_service.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
+@Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
     @Query("SELECT t FROM Transaction t LEFT JOIN FETCH t.category WHERE t.wallet.id = :walletId")
@@ -23,10 +26,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByInvestmentSimulationId(Long investmentSimulationId);
 
+    List<Transaction> findByInstallmentGroupKey(String installmentGroupKey);
+
+    @Query("SELECT t FROM Transaction t WHERE t.wallet.user.id = :userId AND t.transactionDate BETWEEN :startDate AND :endDate")
+    List<Transaction> findByUserIdAndTransactionDateBetween(@Param("userId") Long userId,
+                                                            @Param("startDate") LocalDateTime startDate,
+                                                            @Param("endDate") LocalDateTime endDate);
+
     @Query("""
         SELECT new com.moneta.wallet_service.dto.response.MonthlySummaryResponse(
             COALESCE(SUM(CASE WHEN t.transactionType = com.moneta.wallet_service.enums.TransactionType.INCOME THEN t.amount ELSE 0 END), 0),
-            COALESCE(SUM(CASE WHEN t.transactionType = com.moneta.wallet_service.enums.TransactionType.EXPENSE THEN t.amount ELSE 0 END), 0)
+            COALESCE(SUM(CASE WHEN t.transactionType = com.moneta.wallet_service.enums.TransactionType.EXPENSE THEN t.amount ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN t.transactionType = com.moneta.wallet_service.enums.TransactionType.INCOME THEN t.amount ELSE -t.amount END), 0)
         )
         FROM Transaction t 
         WHERE t.wallet.user.id = :userId 

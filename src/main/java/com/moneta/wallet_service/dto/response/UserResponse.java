@@ -4,6 +4,8 @@ public record UserResponse(
         Long id,
         String userName,
         String email,
-        String fullName,
+        String firstName,
+        String lastName,
+        Integer budgetStartDay,
         int walletCount
 ) {}

@@ -5,5 +5,5 @@ import lombok.Getter;
 @Getter
 public enum TransactionType {
     INCOME,
-    EXPENSE;
+    EXPENSE
 }

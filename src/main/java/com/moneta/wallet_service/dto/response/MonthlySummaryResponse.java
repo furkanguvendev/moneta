@@ -4,5 +4,6 @@ import java.math.BigDecimal;
 
 public record MonthlySummaryResponse(
         BigDecimal totalIncome,
-        BigDecimal totalExpense
+        BigDecimal totalExpense,
+        BigDecimal netBalance
 ) {}

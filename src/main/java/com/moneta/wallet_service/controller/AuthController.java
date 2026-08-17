@@ -34,14 +34,15 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest){
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
+        // Record erişimi: loginRequest.getEmail() yerine loginRequest.email()
         UsernamePasswordAuthenticationToken authBileti =
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword());
+                new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
 
         Authentication onayliKullanici = authenticationManager.authenticate(authBileti);
 
         if (onayliKullanici.isAuthenticated()) {
-            User user = userService.getUserByUsernameOrEmailWithRoles(loginRequest.getEmail());
+            User user = userService.getUserByUsernameOrEmailWithRoles(loginRequest.email());
 
             Map<String, Object> extraClaims = new HashMap<>();
             List<String> roles = user.getRoles().stream()
@@ -49,7 +50,7 @@ public class AuthController {
                     .toList();
             extraClaims.put("roles", roles);
 
-            String token = jwtService.generateToken(extraClaims, loginRequest.getEmail());
+            String token = jwtService.generateToken(extraClaims, loginRequest.email());
 
             LoginResponse response = new LoginResponse(
                     user.getId(),
@@ -79,10 +80,19 @@ public class AuthController {
 
         User savedUser = userService.saveUser(user);
 
+        Map<String, Object> extraClaims = new HashMap<>();
+        List<String> roles = savedUser.getRoles().stream()
+                .map(role -> role.getRoleType().name())
+                .toList();
+        extraClaims.put("roles", roles);
+
+        String token = jwtService.generateToken(extraClaims, savedUser.getEmail());
+
         AuthResponse response = new AuthResponse(
+                savedUser.getId(),
                 savedUser.getUserName(),
                 savedUser.getEmail(),
-                "Kayıt işlemi başarıyla tamamlandı."
+                token
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

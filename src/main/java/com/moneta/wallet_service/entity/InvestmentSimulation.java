@@ -4,13 +4,20 @@ import com.moneta.wallet_service.enums.InvestmentType;
 import com.moneta.wallet_service.enums.MaturityType;
 import com.moneta.wallet_service.enums.SimulationStatus;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "investment_simulation")
-@Data
+@Table(name = "investment_simulations")
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode
 public class InvestmentSimulation {
 
     @Id
@@ -46,4 +53,6 @@ public class InvestmentSimulation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SimulationStatus status;
+
+    private String notes;
 }

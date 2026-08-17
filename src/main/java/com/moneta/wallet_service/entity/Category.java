@@ -1,16 +1,16 @@
 package com.moneta.wallet_service.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "category")
+@Table(name = "categories")
 @Getter
 @Setter
 @ToString(exclude = {"user", "transactions"})
@@ -24,17 +24,16 @@ public class Category {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(name = "is_mandatory", nullable = false)
     private boolean isMandatory;
 
-    @Column(name = "is_default")
+    @Column(name = "is_default", nullable = false)
     private boolean isDefault;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
-    private List<Transaction> transactions;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = true)
-    @JsonIgnore
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
+    private List<Transaction> transactions = new ArrayList<>();
 }

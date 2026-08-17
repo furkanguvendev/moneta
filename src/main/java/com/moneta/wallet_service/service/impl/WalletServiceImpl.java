@@ -6,14 +6,15 @@ import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
+import com.moneta.wallet_service.mapper.WalletMapper;
 import com.moneta.wallet_service.repository.WalletRepository;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,22 +25,21 @@ public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
     private final UserService userService;
+    private final WalletMapper walletMapper;
 
     @Override
+    @Transactional
     public WalletResponse createWallet(Long userId, WalletRequest request) {
         User user = userService.getUserById(userId);
 
-        Wallet wallet = new Wallet();
-        wallet.setName(request.name());
-        wallet.setBalance(request.balance());
-        wallet.setCurrency(request.currency());
+        Wallet wallet = walletMapper.toEntity(request);
         wallet.setUser(user);
-        wallet.getCreatedAt();
 
-        return convertToResponse(walletRepository.save(wallet));
+        return walletMapper.toResponse(walletRepository.save(wallet));
     }
 
     @Override
+    @Transactional
     public void updateBalance(Long walletId, BigDecimal amount) {
         Wallet wallet = getWalletEntityById(walletId);
         wallet.setBalance(wallet.getBalance().add(amount));
@@ -48,17 +48,15 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public WalletResponse getWalletById(Long walletId) {
-
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cüzdan bulunamadı."));
+        Wallet wallet = getWalletEntityById(walletId);
 
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        if (!wallet.getUser().getUserName().equals(currentUsername)) {
+        if (!wallet.getUser().getUserName().equals(currentUsername) && !wallet.getUser().getEmail().equals(currentUsername)) {
             throw new AccessDeniedException("Bu cüzdan bilgilerine erişim yetkiniz yok!");
         }
 
-        return convertToResponse(wallet);
+        return walletMapper.toResponse(wallet);
     }
 
     @Override
@@ -70,16 +68,13 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public List<WalletResponse> getWalletsByUserId(Long userId) {
         List<Wallet> wallets = walletRepository.findAllByUserIdWithUser(userId);
-        return wallets.stream()
-                .map(this::convertToResponse)
-                .toList();
+        return wallets.stream().map(walletMapper::toResponse).toList();
     }
 
     @Override
     @Transactional
     public void updateBalanceAfterTransactionDelete(Long walletId, BigDecimal amount, TransactionType type) {
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new RuntimeException("Cüzdan bulunamadı: " + walletId));
+        Wallet wallet = getWalletEntityById(walletId);
 
         if (type == TransactionType.INCOME) {
             wallet.setBalance(wallet.getBalance().subtract(amount));
@@ -93,19 +88,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void deleteWallet(Long walletId) {
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cüzdan bulunamadı! ID: " + walletId));
+        Wallet wallet = getWalletEntityById(walletId);
         walletRepository.delete(wallet);
-    }
-
-    private WalletResponse convertToResponse(Wallet wallet) {
-        return new WalletResponse(
-                wallet.getId(),
-                wallet.getName(),
-                wallet.getBalance(),
-                wallet.getCurrency(),
-                wallet.getUser().getUserName(),
-                wallet.getCreatedAt()
-        );
     }
 }

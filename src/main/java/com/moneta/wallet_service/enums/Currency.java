@@ -12,7 +12,7 @@ public enum Currency {
     private final String displayName;
     private final String symbol;
 
-    Currency(String displayName, String symbol){
+    Currency(String displayName, String symbol) {
         this.displayName = displayName;
         this.symbol = symbol;
     }

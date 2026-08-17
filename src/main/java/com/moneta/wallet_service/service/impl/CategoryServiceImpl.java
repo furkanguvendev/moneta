@@ -4,8 +4,9 @@ import com.moneta.wallet_service.dto.request.CategoryRequest;
 import com.moneta.wallet_service.dto.response.CategoryResponse;
 import com.moneta.wallet_service.entity.Category;
 import com.moneta.wallet_service.entity.User;
-import com.moneta.wallet_service.exception.ResourceNotFoundException; // Kendi sınıfımız
-import com.moneta.wallet_service.exception.BaseException;           // Kendi sınıfımız
+import com.moneta.wallet_service.exception.BaseException;
+import com.moneta.wallet_service.exception.ResourceNotFoundException;
+import com.moneta.wallet_service.mapper.CategoryMapper;
 import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.service.CategoryService;
@@ -22,21 +23,24 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final CategoryMapper categoryMapper;
 
     @Override
     public List<CategoryResponse> getAllCategoriesByUserId(Long userId) {
-        return categoryRepository.findGlobalAndUserCategories(userId)
-                .stream()
-                .map(this::convertToResponse)
-                .toList();
+        List<Category> categories = categoryRepository.findGlobalAndUserCategories(userId);
+        return categories.stream().map(categoryMapper::toResponse).toList();
     }
 
     @Override
     public CategoryResponse getCategoryById(Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Kategori bulunamadı. ID: " + id));
+        Category category = getCategoryEntityById(id);
+        return categoryMapper.toResponse(category);
+    }
 
-        return convertToResponse(category);
+    @Override
+    public Category getCategoryEntityById(Long id) {
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Kategori bulunamadı. ID: " + id));
     }
 
     @Override
@@ -52,20 +56,17 @@ public class CategoryServiceImpl implements CategoryService {
             throw new BaseException("Bu isimde bir kategori zaten mevcut: " + request.name(), HttpStatus.CONFLICT);
         }
 
-        Category category = new Category();
-        category.setName(request.name());
+        Category category = categoryMapper.toEntity(request);
         category.setUser(user);
-        category.setMandatory(request.isMandatory());
         category.setDefault(false);
 
-        return convertToResponse(categoryRepository.save(category));
+        return categoryMapper.toResponse(categoryRepository.save(category));
     }
 
     @Override
     @Transactional
     public void deleteCategory(Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Silinmek istenen kategori bulunamadı. ID: " + id));
+        Category category = getCategoryEntityById(id);
 
         if (category.isDefault()) {
             throw new BaseException("Sistem varsayılan kategorileri silinemez!", HttpStatus.BAD_REQUEST);
@@ -76,18 +77,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public List<CategoryResponse> getMandatoryCategories() {
-        return categoryRepository.findByIsMandatoryTrue()
-                .stream()
-                .map(this::convertToResponse)
-                .toList();
-    }
-
-    private CategoryResponse convertToResponse(Category category) {
-        return new CategoryResponse(
-                category.getId(),
-                category.getName(),
-                category.isMandatory(),
-                category.isDefault()
-        );
+        List<Category> categories = categoryRepository.findByIsMandatoryTrue();
+        return categories.stream().map(categoryMapper::toResponse).toList();
     }
 }
