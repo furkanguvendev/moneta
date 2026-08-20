@@ -16,7 +16,7 @@ import java.util.List;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
-    @Query("SELECT t FROM Transaction t LEFT JOIN FETCH t.category WHERE t.wallet.id = :walletId")
+    @Query("SELECT t FROM Transaction t LEFT JOIN FETCH t.category JOIN FETCH t.wallet WHERE t.wallet.id = :walletId")
     List<Transaction> findByWalletId(@Param("walletId") Long walletId);
 
     @Query("SELECT t.category.name, SUM(t.amount) FROM Transaction t " +

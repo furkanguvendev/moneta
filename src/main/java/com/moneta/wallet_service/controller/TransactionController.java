@@ -1,10 +1,12 @@
 package com.moneta.wallet_service.controller;
 
 import com.moneta.wallet_service.dto.request.TransactionRequest;
+import com.moneta.wallet_service.dto.request.TransactionUpdateRequest;
 import com.moneta.wallet_service.dto.response.TransactionResponse;
 import com.moneta.wallet_service.dto.response.TransactionStatisticsResponse;
 import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.service.TransactionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,13 @@ public class TransactionController {
         return ResponseEntity.ok(statistics);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<TransactionResponse> updateTransaction(
+            @PathVariable Long id,
+            @Valid @RequestBody TransactionUpdateRequest request) {
+        return ResponseEntity.ok(transactionService.updateTransaction(id, request));
+    }
+
     @PostMapping
     public ResponseEntity<TransactionResponse> addTransaction(@RequestBody TransactionRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.addTransaction(request));
@@ -47,4 +56,5 @@ public class TransactionController {
         transactionService.deleteTransaction(id);
         return ResponseEntity.noContent().build();
     }
+
 }

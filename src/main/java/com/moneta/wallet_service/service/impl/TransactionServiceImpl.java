@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.service.impl;
 
 import com.moneta.wallet_service.dto.request.TransactionRequest;
+import com.moneta.wallet_service.dto.request.TransactionUpdateRequest;
 import com.moneta.wallet_service.dto.response.TransactionResponse;
 import com.moneta.wallet_service.dto.response.TransactionStatisticsResponse;
 import com.moneta.wallet_service.entity.Category;
@@ -108,6 +109,7 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TransactionResponse> getTransactions(Long walletId) {
         List<Transaction> transactions = transactionRepository.findByWalletId(walletId);
         return transactions.stream().map(transactionMapper::toResponse).toList();
@@ -182,6 +184,38 @@ public class TransactionServiceImpl implements TransactionService {
                         calculatePercentage((BigDecimal) result[2], totalExpense)
                 ))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public TransactionResponse updateTransaction(Long transactionId, TransactionUpdateRequest request) {
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Güncellenecek işlem bulunamadı! ID: " + transactionId));
+
+        Wallet wallet = transaction.getWallet();
+
+        BigDecimal oldImpact = (transaction.getTransactionType() == TransactionType.INCOME)
+                ? transaction.getAmount().negate()
+                : transaction.getAmount();
+        walletService.updateBalance(wallet.getId(), oldImpact);
+
+        Category category = categoryService.getCategoryEntityById(request.categoryId());
+
+        transaction.setAmount(request.amount());
+        transaction.setDescription(request.description());
+        transaction.setTransactionType(request.transactionType());
+        transaction.setCategory(category);
+
+        if (request.transactionDate() != null) {
+            transaction.setTransactionDate(request.transactionDate());
+        }
+
+        BigDecimal newImpact = (request.transactionType() == TransactionType.INCOME)
+                ? request.amount()
+                : request.amount().negate();
+        walletService.updateBalance(wallet.getId(), newImpact);
+
+        return transactionMapper.toResponse(transactionRepository.save(transaction));
     }
 
     private double calculatePercentage(BigDecimal amount, BigDecimal total) {

@@ -1,6 +1,7 @@
 package com.moneta.wallet_service.service;
 
 import com.moneta.wallet_service.dto.request.TransactionRequest;
+import com.moneta.wallet_service.dto.request.TransactionUpdateRequest;
 import com.moneta.wallet_service.dto.response.TransactionResponse;
 import com.moneta.wallet_service.dto.response.TransactionStatisticsResponse;
 
@@ -22,4 +23,6 @@ public interface TransactionService {
     void deleteInstallmentGroup(String installmentGroupKey);
 
     List<TransactionStatisticsResponse> getExpenseStatistics(Long walletId);
+
+    TransactionResponse updateTransaction(Long transactionId, TransactionUpdateRequest request);
 }
