@@ -10,6 +10,9 @@ public record DebtResponse(
         String title,
         BigDecimal totalAmount,
         BigDecimal remainingAmount,
+        Integer totalInstallments,
+        Integer paidInstallments,
+        BigDecimal monthlyInstallment,
         DebtType debtType,
         LocalDate dueDate,
         boolean isCompleted

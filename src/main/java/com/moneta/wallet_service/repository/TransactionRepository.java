@@ -19,10 +19,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t FROM Transaction t LEFT JOIN FETCH t.category JOIN FETCH t.wallet WHERE t.wallet.id = :walletId")
     List<Transaction> findByWalletId(@Param("walletId") Long walletId);
 
-    @Query("SELECT t.category.name, SUM(t.amount) FROM Transaction t " +
+    @Query("SELECT t.category.id, t.category.name, SUM(t.amount) FROM Transaction t " +
             "WHERE t.wallet.id = :walletId AND t.transactionType = com.moneta.wallet_service.enums.TransactionType.EXPENSE " +
-            "GROUP BY t.category.name")
-    List<Object[]> getExpenceBreakdownByCategory(@Param("walletId") Long walletId);
+            "GROUP BY t.category.id, t.category.name")
+    List<Object[]> getExpenseBreakdownByCategory(@Param("walletId") Long walletId);
 
     List<Transaction> findByInvestmentSimulationId(Long investmentSimulationId);
 

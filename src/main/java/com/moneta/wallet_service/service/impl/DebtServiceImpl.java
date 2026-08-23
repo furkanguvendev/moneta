@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,6 +47,17 @@ public class DebtServiceImpl implements DebtService {
         Debt debt = debtMapper.toEntity(request);
         debt.setUser(user);
 
+        // Aylık taksit tutarını hesapla
+        int installments = request.totalInstallments() != null && request.totalInstallments() > 0
+                ? request.totalInstallments() : 1;
+
+        debt.setTotalInstallments(installments);
+
+        BigDecimal monthly = request.totalAmount().divide(
+                BigDecimal.valueOf(installments), 2, RoundingMode.HALF_UP
+        );
+        debt.setMonthlyInstallment(monthly);
+
         return debtMapper.toResponse(debtRepository.save(debt));
     }
 
@@ -53,40 +65,46 @@ public class DebtServiceImpl implements DebtService {
     @Transactional
     public DebtResponse makePayment(Long debtId, DebtPaymentRequest request) {
         Debt debt = debtRepository.findById(debtId)
-                .orElseThrow(() -> new ResourceNotFoundException("Borç kaydı bulunamadı! ID: " + debtId));
+                .orElseThrow(() -> new ResourceNotFoundException("Kredi/Taksit kaydı bulunamadı! ID: " + debtId));
 
         if (debt.isCompleted()) {
-            throw new BaseException("Bu borç/alacak zaten tamamen kapatılmış!", HttpStatus.BAD_REQUEST);
+            throw new BaseException("Bu kredi/taksit zaten tamamen ödenmiş!", HttpStatus.BAD_REQUEST);
         }
 
-        BigDecimal remaining = debt.getRemainingAmount();
-        if (request.amount().compareTo(remaining) > 0) {
-            throw new BaseException("Ödeme tutarı kalan tutardan fazla olamaz! Kalan: " + remaining, HttpStatus.BAD_REQUEST);
+        BigDecimal paymentAmount = request.amount() != null ? request.amount() : debt.getMonthlyInstallment();
+
+        if (paymentAmount.compareTo(debt.getRemainingAmount()) > 0) {
+            paymentAmount = debt.getRemainingAmount();
         }
 
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
 
-        TransactionType type = (debt.getDebtType() == DebtType.BORC) ? TransactionType.EXPENSE : TransactionType.INCOME;
-
-        if (type == TransactionType.EXPENSE && wallet.getBalance().compareTo(request.amount()) < 0) {
+        if (wallet.getBalance().compareTo(paymentAmount) < 0) {
             throw new BaseException("Yetersiz bakiye!", HttpStatus.BAD_REQUEST);
         }
 
-        BigDecimal impact = (type == TransactionType.INCOME) ? request.amount() : request.amount().negate();
-        walletService.updateBalance(wallet.getId(), impact);
+        walletService.updateBalance(wallet.getId(), paymentAmount.negate());
 
-        debt.setRemainingAmount(debt.getRemainingAmount().subtract(request.amount()));
-        if (debt.getRemainingAmount().compareTo(BigDecimal.ZERO) == 0) {
+        debt.setRemainingAmount(debt.getRemainingAmount().subtract(paymentAmount));
+        debt.setPaidInstallments(debt.getPaidInstallments() + 1);
+
+        if (debt.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0
+                || debt.getPaidInstallments() >= debt.getTotalInstallments()) {
+            debt.setRemainingAmount(BigDecimal.ZERO);
             debt.setCompleted(true);
         }
 
         Transaction tx = new Transaction();
         tx.setWallet(wallet);
-        tx.setAmount(request.amount());
-        tx.setTransactionType(type);
-        tx.setDescription((debt.getDebtType() == DebtType.BORC ? "Borç Ödemesi: " : "Alacak Tahsilatı: ") + debt.getTitle());
+        tx.setAmount(paymentAmount);
+        tx.setTransactionType(TransactionType.EXPENSE);
+        tx.setDescription("Kredi/Taksit Ödemesi: " + debt.getTitle() +
+                " (" + debt.getPaidInstallments() + "/" + debt.getTotalInstallments() + ")");
         tx.setTransactionDate(LocalDateTime.now());
-        categoryRepository.findById(1L).ifPresent(tx::setCategory);
+
+        if (request.categoryId() != null) {
+            categoryRepository.findById(request.categoryId()).ifPresent(tx::setCategory);
+        }
 
         transactionRepository.save(tx);
 
@@ -95,26 +113,23 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     public List<DebtResponse> getDebtsByUserId(Long userId) {
-        List<Debt> debts = debtRepository.findByUserId(userId);
-        return debts.stream().map(debtMapper::toResponse).toList();
+        return debtRepository.findByUserId(userId).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public List<DebtResponse> getDebtsByType(Long userId, DebtType debtType) {
-        List<Debt> debts = debtRepository.findByUserIdAndDebtType(userId, debtType);
-        return debts.stream().map(debtMapper::toResponse).toList();
+        return debtRepository.findByUserIdAndDebtType(userId, debtType).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public List<DebtResponse> getActiveDebts(Long userId) {
-        List<Debt> debts = debtRepository.findByUserIdAndIsCompletedFalse(userId);
-        return debts.stream().map(debtMapper::toResponse).toList();
+        return debtRepository.findByUserIdAndIsCompletedFalse(userId).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public DebtResponse getDebtById(Long debtId) {
         Debt debt = debtRepository.findById(debtId)
-                .orElseThrow(() -> new ResourceNotFoundException("Borç kaydı bulunamadı! ID: " + debtId));
+                .orElseThrow(() -> new ResourceNotFoundException("Kredi kaydı bulunamadı! ID: " + debtId));
         return debtMapper.toResponse(debt);
     }
 
@@ -122,7 +137,7 @@ public class DebtServiceImpl implements DebtService {
     @Transactional
     public void deleteDebt(Long debtId) {
         Debt debt = debtRepository.findById(debtId)
-                .orElseThrow(() -> new ResourceNotFoundException("Silinecek borç bulunamadı! ID: " + debtId));
+                .orElseThrow(() -> new ResourceNotFoundException("Silinecek kayıt bulunamadı! ID: " + debtId));
         debtRepository.delete(debt);
     }
 }

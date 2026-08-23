@@ -9,7 +9,8 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "debts")
-@Data
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 public class Debt {
@@ -26,6 +27,15 @@ public class Debt {
 
     @Column(nullable = false)
     private BigDecimal remainingAmount;
+
+    @Column(name = "total_installments", nullable = false)
+    private Integer totalInstallments;
+
+    @Column(name = "paid_installments", nullable = false)
+    private Integer paidInstallments = 0;
+
+    @Column(name = "monthly_installment", nullable = false)
+    private BigDecimal monthlyInstallment;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "debt_type", nullable = false)

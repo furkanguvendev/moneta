@@ -18,6 +18,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
 
     @Override
+    @Transactional(readOnly = true)
     public UserResponse getUserProfile(Long id) {
         return userMapper.toResponse(getUserById(id));
     }

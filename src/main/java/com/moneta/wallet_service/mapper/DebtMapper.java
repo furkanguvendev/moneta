@@ -17,6 +17,8 @@ public class DebtMapper {
         debt.setRemainingAmount(request.totalAmount());
         debt.setDebtType(request.debtType());
         debt.setDueDate(request.dueDate());
+        debt.setTotalInstallments(request.totalInstallments());
+        debt.setPaidInstallments(0);
         debt.setCompleted(false);
         return debt;
     }
@@ -29,6 +31,9 @@ public class DebtMapper {
                 entity.getTitle(),
                 entity.getTotalAmount(),
                 entity.getRemainingAmount(),
+                entity.getTotalInstallments(),
+                entity.getPaidInstallments(),
+                entity.getMonthlyInstallment(),
                 entity.getDebtType(),
                 entity.getDueDate(),
                 entity.isCompleted()

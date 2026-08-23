@@ -80,7 +80,12 @@ public class TransactionServiceImpl implements TransactionService {
         TransactionType type = request.transactionType();
 
         int count = request.totalInstallment();
-        BigDecimal installmentAmount = request.amount().divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+
+
+        BigDecimal installmentAmount = request.amount().divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
+        BigDecimal totalCalculated = installmentAmount.multiply(BigDecimal.valueOf(count));
+        BigDecimal remainder = request.amount().subtract(totalCalculated);
+
         String groupKey = UUID.randomUUID().toString();
         LocalDateTime startDate = LocalDateTime.now();
 
@@ -91,7 +96,10 @@ public class TransactionServiceImpl implements TransactionService {
             tx.setWallet(wallet);
             tx.setCategory(category);
             tx.setTransactionType(type);
-            tx.setAmount(installmentAmount);
+
+            BigDecimal currentAmount = (i == 0) ? installmentAmount.add(remainder) : installmentAmount;
+            tx.setAmount(currentAmount);
+
             tx.setDescription(request.description() + " (" + (i + 1) + "/" + count + " Taksit)");
             tx.setInstallmentGroupKey(groupKey);
             tx.setCurrentInstallment(i + 1);
@@ -101,7 +109,10 @@ public class TransactionServiceImpl implements TransactionService {
             createdTransactions.add(tx);
         }
 
-        BigDecimal firstMonthImpact = (type == TransactionType.INCOME) ? installmentAmount : installmentAmount.negate();
+        BigDecimal firstMonthImpact = (type == TransactionType.INCOME)
+                ? createdTransactions.get(0).getAmount()
+                : createdTransactions.get(0).getAmount().negate();
+
         walletService.updateBalance(request.walletId(), firstMonthImpact);
 
         List<Transaction> saved = transactionRepository.saveAll(createdTransactions);
@@ -170,7 +181,8 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public List<TransactionStatisticsResponse> getExpenseStatistics(Long walletId) {
-        List<Object[]> results = transactionRepository.getExpenceBreakdownByCategory(walletId);
+
+        List<Object[]> results = transactionRepository.getExpenseBreakdownByCategory(walletId);
 
         BigDecimal totalExpense = results.stream()
                 .map(r -> (BigDecimal) r[2])
@@ -178,9 +190,9 @@ public class TransactionServiceImpl implements TransactionService {
 
         return results.stream()
                 .map(result -> new TransactionStatisticsResponse(
-                        (Long) result[0],
-                        (String) result[1],
-                        (BigDecimal) result[2],
+                        (Long) result[0],      // categoryId
+                        (String) result[1],    // categoryName
+                        (BigDecimal) result[2],// totalAmount
                         calculatePercentage((BigDecimal) result[2], totalExpense)
                 ))
                 .toList();

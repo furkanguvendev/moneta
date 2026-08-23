@@ -4,7 +4,6 @@ import com.moneta.wallet_service.dto.request.TransactionRequest;
 import com.moneta.wallet_service.dto.request.TransactionUpdateRequest;
 import com.moneta.wallet_service.dto.response.TransactionResponse;
 import com.moneta.wallet_service.dto.response.TransactionStatisticsResponse;
-import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/transactions")
@@ -35,8 +32,7 @@ public class TransactionController {
 
     @GetMapping("/statistics/{walletId}")
     public ResponseEntity<List<TransactionStatisticsResponse>> getWalletStatistics(@PathVariable Long walletId) {
-        List<TransactionStatisticsResponse> statistics = transactionService.getExpenseStatistics(walletId);
-        return ResponseEntity.ok(statistics);
+        return ResponseEntity.ok(transactionService.getExpenseStatistics(walletId));
     }
 
     @PutMapping("/{id}")
@@ -47,8 +43,13 @@ public class TransactionController {
     }
 
     @PostMapping
-    public ResponseEntity<TransactionResponse> addTransaction(@RequestBody TransactionRequest request) {
+    public ResponseEntity<TransactionResponse> addTransaction(@Valid @RequestBody TransactionRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.addTransaction(request));
+    }
+
+    @PostMapping("/installment")
+    public ResponseEntity<List<TransactionResponse>> addInstallmentTransaction(@Valid @RequestBody TransactionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.addInstallmentTransaction(request));
     }
 
     @DeleteMapping("/{id}")
@@ -57,4 +58,9 @@ public class TransactionController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/installment/{groupKey}")
+    public ResponseEntity<Void> deleteInstallmentGroup(@PathVariable String groupKey) {
+        transactionService.deleteInstallmentGroup(groupKey);
+        return ResponseEntity.noContent().build();
+    }
 }
