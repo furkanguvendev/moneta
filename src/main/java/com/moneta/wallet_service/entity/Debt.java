@@ -47,7 +47,20 @@ public class Debt {
     @Column(name = "is_completed", nullable = false)
     private boolean isCompleted = false;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    @Column(name = "last_payment_year")
+    private Integer lastPaymentYear;
+
+    @Column(name = "last_payment_month")
+    private Integer lastPaymentMonth;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wallet_id", nullable = false)
+    private Wallet wallet;
 }

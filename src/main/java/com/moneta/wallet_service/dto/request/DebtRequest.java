@@ -24,5 +24,11 @@ public record DebtRequest(
         @Min(value = 1, message = "Taksit sayısı en az 1 olmalıdır.")
         Integer totalInstallments,
 
-        LocalDate dueDate
+        LocalDate dueDate,
+
+        @NotNull(message = "Cüzdan ID'si boş olamaz.")
+        Long walletId,
+
+        @NotNull(message = "Kategori ID'si boş olamaz.")
+        Long categoryId
 ) {}

@@ -19,15 +19,18 @@ import com.moneta.wallet_service.service.DebtService;
 import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DebtServiceImpl implements DebtService {
@@ -43,11 +46,13 @@ public class DebtServiceImpl implements DebtService {
     @Transactional
     public DebtResponse createDebt(Long userId, DebtRequest request) {
         User user = userService.getUserById(userId);
+        Wallet wallet = walletService.getWalletEntityById(request.walletId());
 
         Debt debt = debtMapper.toEntity(request);
         debt.setUser(user);
+        debt.setWallet(wallet);
+        debt.setCategoryId(request.categoryId());
 
-        // Aylık taksit tutarını hesapla
         int installments = request.totalInstallments() != null && request.totalInstallments() > 0
                 ? request.totalInstallments() : 1;
 
@@ -58,7 +63,10 @@ public class DebtServiceImpl implements DebtService {
         );
         debt.setMonthlyInstallment(monthly);
 
-        return debtMapper.toResponse(debtRepository.save(debt));
+        Debt savedDebt = debtRepository.save(debt);
+
+        DebtPaymentRequest firstPayment = new DebtPaymentRequest(wallet.getId(), monthly, request.categoryId(), null);
+        return makePayment(savedDebt.getId(), firstPayment);
     }
 
     @Override
@@ -94,21 +102,81 @@ public class DebtServiceImpl implements DebtService {
             debt.setCompleted(true);
         }
 
+        LocalDateTime txDateTime = request.transactionDate() != null
+                ? request.transactionDate().atStartOfDay()
+                : LocalDateTime.now();
+
+        debt.setLastPaymentYear(txDateTime.getYear());
+        debt.setLastPaymentMonth(txDateTime.getMonthValue());
+
         Transaction tx = new Transaction();
         tx.setWallet(wallet);
         tx.setAmount(paymentAmount);
         tx.setTransactionType(TransactionType.EXPENSE);
         tx.setDescription("Kredi/Taksit Ödemesi: " + debt.getTitle() +
                 " (" + debt.getPaidInstallments() + "/" + debt.getTotalInstallments() + ")");
-        tx.setTransactionDate(LocalDateTime.now());
+        tx.setTransactionDate(txDateTime);
 
-        if (request.categoryId() != null) {
-            categoryRepository.findById(request.categoryId()).ifPresent(tx::setCategory);
+        Long categoryIdToUse = request.categoryId() != null ? request.categoryId() : debt.getCategoryId();
+        if (categoryIdToUse != null) {
+            categoryRepository.findById(categoryIdToUse).ifPresent(tx::setCategory);
         }
 
         transactionRepository.save(tx);
 
         return debtMapper.toResponse(debtRepository.save(debt));
+    }
+
+    @Override
+    @Transactional
+    public void syncMonthlyInstallments(Long walletId, int year, int month) {
+        List<Debt> activeDebts = debtRepository.findByWalletIdAndIsCompletedFalseAndDebtType(walletId, DebtType.KREDI_KARTI_TAKSIDI);
+
+        for (Debt debt : activeDebts) {
+            advanceDebtInstallments(debt.getId(), year, month);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void syncAllDueInstallments() {
+        LocalDate today = LocalDate.now();
+        List<Debt> activeDebts = debtRepository.findByIsCompletedFalseAndDebtType(DebtType.KREDI_KARTI_TAKSIDI);
+
+        for (Debt debt : activeDebts) {
+            advanceDebtInstallments(debt.getId(), today.getYear(), today.getMonthValue());
+        }
+    }
+
+    private void advanceDebtInstallments(Long debtId, int targetYear, int targetMonth) {
+        Debt debt = debtRepository.findById(debtId).orElse(null);
+
+        while (debt != null && !debt.isCompleted()
+                && monthIndex(debt.getLastPaymentYear(), debt.getLastPaymentMonth()) < monthIndex(targetYear, targetMonth)) {
+
+            int nextIndex = monthIndex(debt.getLastPaymentYear(), debt.getLastPaymentMonth()) + 1;
+            int nextYear = (nextIndex - 1) / 12;
+            int nextMonth = (nextIndex - 1) % 12 + 1;
+
+            DebtPaymentRequest request = new DebtPaymentRequest(
+                    debt.getWallet().getId(), debt.getMonthlyInstallment(), debt.getCategoryId(),
+                    LocalDate.of(nextYear, nextMonth, 1)
+            );
+
+            try {
+                makePayment(debt.getId(), request);
+                log.info("Debt {} için {}/{} taksiti otomatik düştü.", debt.getId(), nextMonth, nextYear);
+            } catch (Exception e) {
+                log.warn("Debt {} için {}/{} taksiti düşürülemedi: {}", debt.getId(), nextMonth, nextYear, e.getMessage());
+                break;
+            }
+
+            debt = debtRepository.findById(debtId).orElse(null);
+        }
+    }
+
+    private static int monthIndex(int year, int month) {
+        return year * 12 + month;
     }
 
     @Override

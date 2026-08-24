@@ -15,4 +15,6 @@ public interface DebtService {
     List<DebtResponse> getActiveDebts(Long userId);
     DebtResponse getDebtById(Long debtId);
     void deleteDebt(Long debtId);
+    void syncMonthlyInstallments(Long walletId, int year, int month);
+    void syncAllDueInstallments();
 }

@@ -33,6 +33,15 @@ public class DebtController {
         return ResponseEntity.ok(debtService.makePayment(debtId, request));
     }
 
+    @PostMapping("/wallet/{walletId}/sync")
+    public ResponseEntity<Void> syncInstallments(
+            @PathVariable Long walletId,
+            @RequestParam int year,
+            @RequestParam int month) {
+        debtService.syncMonthlyInstallments(walletId, year, month);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<DebtResponse>> getDebtsByUserId(@PathVariable Long userId) {
         return ResponseEntity.ok(debtService.getDebtsByUserId(userId));
