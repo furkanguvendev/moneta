@@ -149,7 +149,14 @@ public class DebtServiceImpl implements DebtService {
     }
 
     private void advanceDebtInstallments(Long debtId, int targetYear, int targetMonth) {
-        Debt debt = debtRepository.findById(debtId).orElse(null);
+        Debt debt = debtRepository.findByIdForUpdate(debtId).orElse(null);
+
+        if (debt != null && (debt.getLastPaymentYear() == null || debt.getLastPaymentMonth() == null)) {
+            LocalDate fallbackDate = LocalDate.now();
+            debt.setLastPaymentYear(fallbackDate.getYear());
+            debt.setLastPaymentMonth(fallbackDate.getMonthValue());
+            debt = debtRepository.save(debt);
+        }
 
         while (debt != null && !debt.isCompleted()
                 && monthIndex(debt.getLastPaymentYear(), debt.getLastPaymentMonth()) < monthIndex(targetYear, targetMonth)) {
