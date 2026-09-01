@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record TransactionRequest(
         @NotNull(message = "İşlem tutarı boş olamaz.")
@@ -24,5 +25,7 @@ public record TransactionRequest(
         TransactionType transactionType,
 
         @Min(value = 1, message = "Taksit sayısı en az 1 olmalıdır.")
-        Integer totalInstallment
+        Integer totalInstallment,
+
+        LocalDate transactionDate
 ) {}

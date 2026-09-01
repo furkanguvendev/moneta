@@ -30,5 +30,7 @@ public record DebtRequest(
         Long walletId,
 
         @NotNull(message = "Kategori ID'si boş olamaz.")
-        Long categoryId
+        Long categoryId,
+
+        LocalDate startDate
 ) {}

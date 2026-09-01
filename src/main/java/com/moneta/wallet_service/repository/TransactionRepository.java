@@ -28,6 +28,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByInstallmentGroupKey(String installmentGroupKey);
 
+    List<Transaction> findByDebtId(Long debtId);
+
     @Query("SELECT t FROM Transaction t WHERE t.wallet.user.id = :userId AND t.transactionDate BETWEEN :startDate AND :endDate")
     List<Transaction> findByUserIdAndTransactionDateBetween(@Param("userId") Long userId,
                                                             @Param("startDate") LocalDateTime startDate,

@@ -5,6 +5,7 @@ import com.moneta.wallet_service.dto.request.TransactionUpdateRequest;
 import com.moneta.wallet_service.dto.response.TransactionResponse;
 import com.moneta.wallet_service.dto.response.TransactionStatisticsResponse;
 import com.moneta.wallet_service.entity.Category;
+import com.moneta.wallet_service.entity.Debt;
 import com.moneta.wallet_service.entity.Transaction;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
@@ -12,6 +13,7 @@ import com.moneta.wallet_service.enums.TransactionType;
 import com.moneta.wallet_service.exception.BaseException;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
 import com.moneta.wallet_service.mapper.TransactionMapper;
+import com.moneta.wallet_service.repository.DebtRepository;
 import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.CategoryService;
 import com.moneta.wallet_service.service.InvestmentSimulationService;
@@ -38,6 +40,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final CategoryService categoryService;
     private final InvestmentSimulationService investmentSimulationService;
     private final TransactionMapper transactionMapper;
+    private final DebtRepository debtRepository;
 
     @Override
     public TransactionResponse getTransactionById(Long transactionId) {
@@ -63,7 +66,11 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionMapper.toEntity(request);
         transaction.setWallet(wallet);
         transaction.setCategory(category);
-        transaction.setTransactionDate(LocalDateTime.now());
+
+        LocalDateTime txDateTime = request.transactionDate() != null
+                ? request.transactionDate().atStartOfDay()
+                : LocalDateTime.now();
+        transaction.setTransactionDate(txDateTime);
 
         return transactionMapper.toResponse(transactionRepository.save(transaction));
     }
@@ -81,13 +88,14 @@ public class TransactionServiceImpl implements TransactionService {
 
         int count = request.totalInstallment();
 
-
         BigDecimal installmentAmount = request.amount().divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
         BigDecimal totalCalculated = installmentAmount.multiply(BigDecimal.valueOf(count));
         BigDecimal remainder = request.amount().subtract(totalCalculated);
 
         String groupKey = UUID.randomUUID().toString();
-        LocalDateTime startDate = LocalDateTime.now();
+        LocalDateTime startDate = request.transactionDate() != null
+                ? request.transactionDate().atStartOfDay()
+                : LocalDateTime.now();
 
         List<Transaction> createdTransactions = new ArrayList<>();
 
@@ -180,6 +188,83 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    @Transactional
+    public void deleteTransactionsByMonth(Long walletId, int year, int month) {
+        List<Transaction> monthTransactions = transactionRepository.findByWalletId(walletId).stream()
+                .filter(tx -> tx.getTransactionDate() != null
+                        && tx.getTransactionDate().getYear() == year
+                        && tx.getTransactionDate().getMonthValue() == month)
+                .toList();
+
+        for (Transaction tx : monthTransactions) {
+            if (tx.getDebtId() != null) {
+                handleDebtLinkedTransactionDeletion(tx, year, month);
+            } else {
+                BigDecimal reverseImpact = (tx.getTransactionType() == TransactionType.INCOME)
+                        ? tx.getAmount().negate()
+                        : tx.getAmount();
+                walletService.updateBalance(tx.getWallet().getId(), reverseImpact);
+                transactionRepository.delete(tx);
+            }
+        }
+    }
+
+    private void handleDebtLinkedTransactionDeletion(Transaction tx, int year, int month) {
+        Debt debt = debtRepository.findById(tx.getDebtId()).orElse(null);
+
+        if (debt == null) {
+            BigDecimal reverseImpact = (tx.getTransactionType() == TransactionType.INCOME)
+                    ? tx.getAmount().negate()
+                    : tx.getAmount();
+            walletService.updateBalance(tx.getWallet().getId(), reverseImpact);
+            transactionRepository.delete(tx);
+            return;
+        }
+
+        List<Transaction> allDebtTransactions = transactionRepository.findByDebtId(debt.getId());
+
+        boolean isFirstInstallmentMonth = allDebtTransactions.stream()
+                .map(Transaction::getTransactionDate)
+                .filter(date -> date != null)
+                .min(LocalDateTime::compareTo)
+                .map(earliest -> earliest.getYear() == year && earliest.getMonthValue() == month)
+                .orElse(false);
+
+        if (isFirstInstallmentMonth) {
+            for (Transaction debtTx : allDebtTransactions) {
+                walletService.updateBalance(debtTx.getWallet().getId(), debtTx.getAmount());
+            }
+            transactionRepository.deleteAll(allDebtTransactions);
+            debtRepository.delete(debt);
+        } else {
+            walletService.updateBalance(tx.getWallet().getId(), tx.getAmount());
+            transactionRepository.delete(tx);
+
+            debt.setPaidInstallments(Math.max(0, debt.getPaidInstallments() - 1));
+            debt.setRemainingAmount(debt.getRemainingAmount().add(tx.getAmount()));
+            debt.setCompleted(false);
+
+            List<Transaction> remainingDebtTransactions = transactionRepository.findByDebtId(debt.getId());
+            remainingDebtTransactions.stream()
+                    .map(Transaction::getTransactionDate)
+                    .filter(date -> date != null)
+                    .max(LocalDateTime::compareTo)
+                    .ifPresentOrElse(
+                            latest -> {
+                                debt.setLastPaymentYear(latest.getYear());
+                                debt.setLastPaymentMonth(latest.getMonthValue());
+                            },
+                            () -> {
+                                debt.setLastPaymentYear(null);
+                                debt.setLastPaymentMonth(null);
+                            }
+                    );
+
+            debtRepository.save(debt);
+        }
+    }
+
+    @Override
     public List<TransactionStatisticsResponse> getExpenseStatistics(Long walletId) {
 
         List<Object[]> results = transactionRepository.getExpenseBreakdownByCategory(walletId);
@@ -190,9 +275,9 @@ public class TransactionServiceImpl implements TransactionService {
 
         return results.stream()
                 .map(result -> new TransactionStatisticsResponse(
-                        (Long) result[0],      // categoryId
-                        (String) result[1],    // categoryName
-                        (BigDecimal) result[2],// totalAmount
+                        (Long) result[0],
+                        (String) result[1],
+                        (BigDecimal) result[2],
                         calculatePercentage((BigDecimal) result[2], totalExpense)
                 ))
                 .toList();

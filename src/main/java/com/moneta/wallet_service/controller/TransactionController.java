@@ -63,4 +63,13 @@ public class TransactionController {
         transactionService.deleteInstallmentGroup(groupKey);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/wallet/{walletId}/month/{year}/{month}")
+    public ResponseEntity<Void> deleteTransactionsByMonth(
+            @PathVariable Long walletId,
+            @PathVariable int year,
+            @PathVariable int month) {
+        transactionService.deleteTransactionsByMonth(walletId, year, month);
+        return ResponseEntity.noContent().build();
+    }
 }

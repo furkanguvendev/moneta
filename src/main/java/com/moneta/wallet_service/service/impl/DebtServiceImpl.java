@@ -65,7 +65,9 @@ public class DebtServiceImpl implements DebtService {
 
         Debt savedDebt = debtRepository.save(debt);
 
-        DebtPaymentRequest firstPayment = new DebtPaymentRequest(wallet.getId(), monthly, request.categoryId(), null);
+        DebtPaymentRequest firstPayment = new DebtPaymentRequest(
+                wallet.getId(), monthly, request.categoryId(), request.startDate()
+        );
         return makePayment(savedDebt.getId(), firstPayment);
     }
 
@@ -116,6 +118,7 @@ public class DebtServiceImpl implements DebtService {
         tx.setDescription("Kredi/Taksit Ödemesi: " + debt.getTitle() +
                 " (" + debt.getPaidInstallments() + "/" + debt.getTotalInstallments() + ")");
         tx.setTransactionDate(txDateTime);
+        tx.setDebtId(debt.getId());
 
         Long categoryIdToUse = request.categoryId() != null ? request.categoryId() : debt.getCategoryId();
         if (categoryIdToUse != null) {
@@ -213,6 +216,14 @@ public class DebtServiceImpl implements DebtService {
     public void deleteDebt(Long debtId) {
         Debt debt = debtRepository.findById(debtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Silinecek kayıt bulunamadı! ID: " + debtId));
+
+        List<Transaction> relatedTransactions = transactionRepository.findByDebtId(debtId);
+
+        for (Transaction tx : relatedTransactions) {
+            walletService.updateBalance(tx.getWallet().getId(), tx.getAmount());
+        }
+
+        transactionRepository.deleteAll(relatedTransactions);
         debtRepository.delete(debt);
     }
 }

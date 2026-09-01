@@ -25,4 +25,6 @@ public interface TransactionService {
     List<TransactionStatisticsResponse> getExpenseStatistics(Long walletId);
 
     TransactionResponse updateTransaction(Long transactionId, TransactionUpdateRequest request);
+
+    void deleteTransactionsByMonth(Long walletId, int year, int month);
 }

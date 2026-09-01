@@ -53,4 +53,7 @@ public class Transaction {
 
     @Column(name = "total_installment")
     private Integer totalInstallment;
+
+    @Column(name = "debt_id")
+    private Long debtId;
 }
