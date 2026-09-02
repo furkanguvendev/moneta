@@ -1,5 +1,6 @@
 package com.moneta.wallet_service.service.impl;
 
+import com.moneta.wallet_service.dto.request.UserUpdateRequest;
 import com.moneta.wallet_service.dto.response.UserResponse;
 import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.exception.ResourceNotFoundException;
@@ -54,5 +55,23 @@ public class UserServiceImpl implements UserService {
     public User getUserByUsernameOrEmailWithRoles(String usernameOrEmail) {
         return userRepository.findByUserNameOrEmailWithRoles(usernameOrEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı: " + usernameOrEmail));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateUserProfile(Long id, UserUpdateRequest request) {
+        User user = getUserById(id);
+
+        if (request.firstName() != null) {
+            user.setFirstName(request.firstName());
+        }
+        if (request.lastName() != null) {
+            user.setLastName(request.lastName());
+        }
+        if (request.budgetStartDay() != null) {
+            user.setBudgetStartDay(request.budgetStartDay());
+        }
+
+        return userMapper.toResponse(userRepository.save(user));
     }
 }

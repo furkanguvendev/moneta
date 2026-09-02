@@ -27,13 +27,18 @@ public class WalletServiceImpl implements WalletService {
     private final UserService userService;
     private final WalletMapper walletMapper;
 
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.getUserByUsernameOrEmail(email);
+    }
+
     @Override
     @Transactional
     public WalletResponse createWallet(Long userId, WalletRequest request) {
-        User user = userService.getUserById(userId);
+        User authenticatedUser = getAuthenticatedUser();
 
         Wallet wallet = walletMapper.toEntity(request);
-        wallet.setUser(user);
+        wallet.setUser(authenticatedUser);
 
         return walletMapper.toResponse(walletRepository.save(wallet));
     }
@@ -49,10 +54,9 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public WalletResponse getWalletById(Long walletId) {
         Wallet wallet = getWalletEntityById(walletId);
+        User authenticatedUser = getAuthenticatedUser();
 
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        if (!wallet.getUser().getUserName().equals(currentUsername) && !wallet.getUser().getEmail().equals(currentUsername)) {
+        if (!wallet.getUser().getId().equals(authenticatedUser.getId())) {
             throw new AccessDeniedException("Bu cüzdan bilgilerine erişim yetkiniz yok!");
         }
 
@@ -67,7 +71,8 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public List<WalletResponse> getWalletsByUserId(Long userId) {
-        List<Wallet> wallets = walletRepository.findAllByUserIdWithUser(userId);
+        User authenticatedUser = getAuthenticatedUser();
+        List<Wallet> wallets = walletRepository.findAllByUserIdWithUser(authenticatedUser.getId());
         return wallets.stream().map(walletMapper::toResponse).toList();
     }
 
@@ -89,6 +94,12 @@ public class WalletServiceImpl implements WalletService {
     @Transactional
     public void deleteWallet(Long walletId) {
         Wallet wallet = getWalletEntityById(walletId);
+        User authenticatedUser = getAuthenticatedUser();
+
+        if (!wallet.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new AccessDeniedException("Bu cüzdanı silme yetkiniz yok!");
+        }
+
         walletRepository.delete(wallet);
     }
 }

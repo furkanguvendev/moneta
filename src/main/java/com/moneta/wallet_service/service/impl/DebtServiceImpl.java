@@ -21,6 +21,9 @@ import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,14 +45,48 @@ public class DebtServiceImpl implements DebtService {
     private final TransactionRepository transactionRepository;
     private final DebtMapper debtMapper;
 
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.getUserByUsernameOrEmail(email);
+    }
+
+    private User getAuthenticatedUserOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return null;
+        }
+        try {
+            return userService.getUserByUsernameOrEmail(auth.getName());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void verifyDebtOwnership(Debt debt) {
+        User authUser = getAuthenticatedUserOrNull();
+        if (authUser == null) {
+            return;
+        }
+        if (!debt.getUser().getId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu borç kaydına erişim yetkiniz yok!");
+        }
+    }
+
+    private void verifyWalletOwnership(Wallet wallet, User authUser) {
+        if (!wallet.getUser().getId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu cüzdana erişim yetkiniz yok!");
+        }
+    }
+
     @Override
     @Transactional
     public DebtResponse createDebt(Long userId, DebtRequest request) {
-        User user = userService.getUserById(userId);
+        User authUser = getAuthenticatedUser();
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
+        verifyWalletOwnership(wallet, authUser);
 
         Debt debt = debtMapper.toEntity(request);
-        debt.setUser(user);
+        debt.setUser(authUser);
         debt.setWallet(wallet);
         debt.setCategoryId(request.categoryId());
 
@@ -76,6 +113,8 @@ public class DebtServiceImpl implements DebtService {
     public DebtResponse makePayment(Long debtId, DebtPaymentRequest request) {
         Debt debt = debtRepository.findById(debtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Kredi/Taksit kaydı bulunamadı! ID: " + debtId));
+
+        verifyDebtOwnership(debt);
 
         if (debt.isCompleted()) {
             throw new BaseException("Bu kredi/taksit zaten tamamen ödenmiş!", HttpStatus.BAD_REQUEST);
@@ -133,6 +172,10 @@ public class DebtServiceImpl implements DebtService {
     @Override
     @Transactional
     public void syncMonthlyInstallments(Long walletId, int year, int month) {
+        User authUser = getAuthenticatedUser();
+        Wallet wallet = walletService.getWalletEntityById(walletId);
+        verifyWalletOwnership(wallet, authUser);
+
         List<Debt> activeDebts = debtRepository.findByWalletIdAndIsCompletedFalseAndDebtType(walletId, DebtType.KREDI_KARTI_TAKSIDI);
 
         for (Debt debt : activeDebts) {
@@ -191,23 +234,27 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     public List<DebtResponse> getDebtsByUserId(Long userId) {
-        return debtRepository.findByUserId(userId).stream().map(debtMapper::toResponse).toList();
+        User authUser = getAuthenticatedUser();
+        return debtRepository.findByUserId(authUser.getId()).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public List<DebtResponse> getDebtsByType(Long userId, DebtType debtType) {
-        return debtRepository.findByUserIdAndDebtType(userId, debtType).stream().map(debtMapper::toResponse).toList();
+        User authUser = getAuthenticatedUser();
+        return debtRepository.findByUserIdAndDebtType(authUser.getId(), debtType).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public List<DebtResponse> getActiveDebts(Long userId) {
-        return debtRepository.findByUserIdAndIsCompletedFalse(userId).stream().map(debtMapper::toResponse).toList();
+        User authUser = getAuthenticatedUser();
+        return debtRepository.findByUserIdAndIsCompletedFalse(authUser.getId()).stream().map(debtMapper::toResponse).toList();
     }
 
     @Override
     public DebtResponse getDebtById(Long debtId) {
         Debt debt = debtRepository.findById(debtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Kredi kaydı bulunamadı! ID: " + debtId));
+        verifyDebtOwnership(debt);
         return debtMapper.toResponse(debt);
     }
 
@@ -216,6 +263,8 @@ public class DebtServiceImpl implements DebtService {
     public void deleteDebt(Long debtId) {
         Debt debt = debtRepository.findById(debtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Silinecek kayıt bulunamadı! ID: " + debtId));
+
+        verifyDebtOwnership(debt);
 
         List<Transaction> relatedTransactions = transactionRepository.findByDebtId(debtId);
 

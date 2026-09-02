@@ -1,5 +1,6 @@
 package com.moneta.wallet_service.service;
 
+import com.moneta.wallet_service.dto.request.UserUpdateRequest;
 import com.moneta.wallet_service.dto.response.UserResponse;
 import com.moneta.wallet_service.entity.User;
 
@@ -10,4 +11,5 @@ public interface UserService {
     User getUserByUsernameOrEmailWithRoles(String usernameOrEmail);
     User saveUser(User user);
     void deleteUser(Long userId);
+    UserResponse updateUserProfile(Long id, UserUpdateRequest request);
 }

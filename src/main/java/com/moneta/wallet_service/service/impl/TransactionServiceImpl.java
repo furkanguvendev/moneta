@@ -18,9 +18,12 @@ import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.CategoryService;
 import com.moneta.wallet_service.service.InvestmentSimulationService;
 import com.moneta.wallet_service.service.TransactionService;
+import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,11 +44,25 @@ public class TransactionServiceImpl implements TransactionService {
     private final InvestmentSimulationService investmentSimulationService;
     private final TransactionMapper transactionMapper;
     private final DebtRepository debtRepository;
+    private final UserService userService;
+
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.getUserByUsernameOrEmail(email);
+    }
+
+    private void verifyWalletOwnership(Wallet wallet) {
+        User authUser = getAuthenticatedUser();
+        if (!wallet.getUser().getId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu cüzdana erişim yetkiniz yok!");
+        }
+    }
 
     @Override
     public TransactionResponse getTransactionById(Long transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("İşlem bulunamadı! ID: " + transactionId));
+        verifyWalletOwnership(transaction.getWallet());
         return transactionMapper.toResponse(transaction);
     }
 
@@ -53,6 +70,8 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public TransactionResponse addTransaction(TransactionRequest request) {
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
+        verifyWalletOwnership(wallet);
+
         Category category = categoryService.getCategoryEntityById(request.categoryId());
         TransactionType type = request.transactionType();
 
@@ -83,6 +102,8 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
+        verifyWalletOwnership(wallet);
+
         Category category = categoryService.getCategoryEntityById(request.categoryId());
         TransactionType type = request.transactionType();
 
@@ -130,13 +151,18 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional(readOnly = true)
     public List<TransactionResponse> getTransactions(Long walletId) {
+        Wallet wallet = walletService.getWalletEntityById(walletId);
+        verifyWalletOwnership(wallet);
+
         List<Transaction> transactions = transactionRepository.findByWalletId(walletId);
         return transactions.stream().map(transactionMapper::toResponse).toList();
     }
 
     @Override
     public List<TransactionResponse> getCurrentBudgetPeriodTransactions(Long userId) {
-        Wallet wallet = walletService.getWalletsByUserId(userId).stream().findFirst()
+        User authUser = getAuthenticatedUser();
+
+        Wallet wallet = walletService.getWalletsByUserId(authUser.getId()).stream().findFirst()
                 .map(w -> walletService.getWalletEntityById(w.id()))
                 .orElseThrow(() -> new ResourceNotFoundException("Kullanıcıya ait cüzdan bulunamadı."));
 
@@ -155,7 +181,7 @@ public class TransactionServiceImpl implements TransactionService {
             endDate = startDate.plusMonths(1).minusNanos(1);
         }
 
-        List<Transaction> transactions = transactionRepository.findByUserIdAndTransactionDateBetween(userId, startDate, endDate);
+        List<Transaction> transactions = transactionRepository.findByUserIdAndTransactionDateBetween(authUser.getId(), startDate, endDate);
         return transactions.stream().map(transactionMapper::toResponse).toList();
     }
 
@@ -164,6 +190,8 @@ public class TransactionServiceImpl implements TransactionService {
     public void deleteTransaction(Long transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Silinecek işlem bulunamadı! ID: " + transactionId));
+
+        verifyWalletOwnership(transaction.getWallet());
 
         if (transaction.getInvestmentSimulationId() != null) {
             investmentSimulationService.deleteSimulationById(transaction.getInvestmentSimulationId());
@@ -183,6 +211,7 @@ public class TransactionServiceImpl implements TransactionService {
     public void deleteInstallmentGroup(String installmentGroupKey) {
         List<Transaction> groupTransactions = transactionRepository.findByInstallmentGroupKey(installmentGroupKey);
         if (!groupTransactions.isEmpty()) {
+            verifyWalletOwnership(groupTransactions.get(0).getWallet());
             transactionRepository.deleteAll(groupTransactions);
         }
     }
@@ -190,6 +219,9 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional
     public void deleteTransactionsByMonth(Long walletId, int year, int month) {
+        Wallet wallet = walletService.getWalletEntityById(walletId);
+        verifyWalletOwnership(wallet);
+
         List<Transaction> monthTransactions = transactionRepository.findByWalletId(walletId).stream()
                 .filter(tx -> tx.getTransactionDate() != null
                         && tx.getTransactionDate().getYear() == year
@@ -266,6 +298,8 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public List<TransactionStatisticsResponse> getExpenseStatistics(Long walletId) {
+        Wallet wallet = walletService.getWalletEntityById(walletId);
+        verifyWalletOwnership(wallet);
 
         List<Object[]> results = transactionRepository.getExpenseBreakdownByCategory(walletId);
 
@@ -290,6 +324,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Güncellenecek işlem bulunamadı! ID: " + transactionId));
 
         Wallet wallet = transaction.getWallet();
+        verifyWalletOwnership(wallet);
 
         BigDecimal oldImpact = (transaction.getTransactionType() == TransactionType.INCOME)
                 ? transaction.getAmount().negate()
