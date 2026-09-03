@@ -5,6 +5,7 @@ import com.moneta.wallet_service.dto.request.SimulationRequest;
 import com.moneta.wallet_service.dto.response.SimulationResponse;
 import com.moneta.wallet_service.entity.InvestmentSimulation;
 import com.moneta.wallet_service.entity.Transaction;
+import com.moneta.wallet_service.entity.User;
 import com.moneta.wallet_service.entity.Wallet;
 import com.moneta.wallet_service.enums.InvestmentType;
 import com.moneta.wallet_service.enums.SimulationStatus;
@@ -15,8 +16,12 @@ import com.moneta.wallet_service.repository.CategoryRepository;
 import com.moneta.wallet_service.repository.InvestmentSimulationRepository;
 import com.moneta.wallet_service.repository.TransactionRepository;
 import com.moneta.wallet_service.service.InvestmentSimulationService;
+import com.moneta.wallet_service.service.UserService;
 import com.moneta.wallet_service.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,23 +41,47 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
     private final SimulationMapper simulationMapper;
+    private final UserService userService;
+
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.getUserByUsernameOrEmail(email);
+    }
+
+    private User getAuthenticatedUserOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return null;
+        }
+        try {
+            return userService.getUserByUsernameOrEmail(auth.getName());
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     @Override
     public List<SimulationResponse> getActiveSimulations(Long userId) {
-        List<InvestmentSimulation> list = simulationRepository.findByUserIdAndStatus(userId, SimulationStatus.ACTIVE);
+        User authUser = getAuthenticatedUser();
+        List<InvestmentSimulation> list = simulationRepository.findByUserIdAndStatus(authUser.getId(), SimulationStatus.ACTIVE);
         return list.stream().map(sim -> simulationMapper.toResponse(sim, sim.getEntryValue())).toList();
     }
 
     @Override
     @Transactional
     public SimulationResponse createSimulation(Long userId, SimulationRequest request) {
+        User authUser = getAuthenticatedUser();
         Wallet wallet = walletService.getWalletEntityById(request.walletId());
+
+        if (!wallet.getUser().getId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu cüzdana erişim yetkiniz yok!");
+        }
 
         if (wallet.getBalance().compareTo(request.amount()) < 0) {
             throw new RuntimeException("Cüzdandaki bakiye simülasyon başlatmak için yetersiz!");
         }
 
-        InvestmentSimulation simulation = simulationMapper.toEntity(request, userId);
+        InvestmentSimulation simulation = simulationMapper.toEntity(request, authUser.getId());
 
         LocalDate now = LocalDate.now();
         if (request.investmentType() == InvestmentType.FAIZ && request.maturityType() != null) {
@@ -86,10 +115,11 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
     @Override
     @Transactional
     public SimulationResponse closeOrCancelSimulation(Long id, Long userId, SimulationCloseRequest request) {
+        User authUser = getAuthenticatedUser();
         InvestmentSimulation simulation = getSimulationEntityById(id);
 
-        if (!simulation.getUserId().equals(userId)) {
-            throw new RuntimeException("Bu simülasyon üzerinde işlem yapma yetkiniz yok!");
+        if (!simulation.getUserId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu simülasyon üzerinde işlem yapma yetkiniz yok!");
         }
 
         if (simulation.getStatus() != SimulationStatus.ACTIVE) {
@@ -147,6 +177,11 @@ public class InvestmentSimulationServiceImpl implements InvestmentSimulationServ
         InvestmentSimulation simulation = simulationRepository.findById(id).orElse(null);
 
         if (simulation != null) {
+            User authUser = getAuthenticatedUserOrNull();
+            if (authUser != null && !simulation.getUserId().equals(authUser.getId())) {
+                throw new AccessDeniedException("Bu simülasyonu silme yetkiniz yok!");
+            }
+
             List<Transaction> transactions = transactionRepository.findByInvestmentSimulationId(id);
             BigDecimal netAdjustment = BigDecimal.ZERO;
 

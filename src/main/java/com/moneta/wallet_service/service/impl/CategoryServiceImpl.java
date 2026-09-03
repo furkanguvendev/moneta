@@ -12,6 +12,8 @@ import com.moneta.wallet_service.repository.UserRepository;
 import com.moneta.wallet_service.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +27,16 @@ public class CategoryServiceImpl implements CategoryService {
     private final UserRepository userRepository;
     private final CategoryMapper categoryMapper;
 
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUserNameOrEmail(email, email)
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı: " + email));
+    }
+
     @Override
     public List<CategoryResponse> getAllCategoriesByUserId(Long userId) {
-        List<Category> categories = categoryRepository.findGlobalAndUserCategories(userId);
+        User authUser = getAuthenticatedUser();
+        List<Category> categories = categoryRepository.findGlobalAndUserCategories(authUser.getId());
         return categories.stream().map(categoryMapper::toResponse).toList();
     }
 
@@ -46,18 +55,17 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public CategoryResponse createCategory(CategoryRequest request, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı. ID: " + userId));
+        User authUser = getAuthenticatedUser();
 
         boolean isDuplicate = categoryRepository.existsByNameAndUserIdIsNull(request.name()) ||
-                categoryRepository.existsByNameAndUserId(request.name(), userId);
+                categoryRepository.existsByNameAndUserId(request.name(), authUser.getId());
 
         if (isDuplicate) {
             throw new BaseException("Bu isimde bir kategori zaten mevcut: " + request.name(), HttpStatus.CONFLICT);
         }
 
         Category category = categoryMapper.toEntity(request);
-        category.setUser(user);
+        category.setUser(authUser);
         category.setDefault(false);
 
         return categoryMapper.toResponse(categoryRepository.save(category));
@@ -70,6 +78,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         if (category.isDefault()) {
             throw new BaseException("Sistem varsayılan kategorileri silinemez!", HttpStatus.BAD_REQUEST);
+        }
+
+        User authUser = getAuthenticatedUser();
+        if (category.getUser() == null || !category.getUser().getId().equals(authUser.getId())) {
+            throw new AccessDeniedException("Bu kategoriyi silme yetkiniz yok!");
         }
 
         categoryRepository.delete(category);
